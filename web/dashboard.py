@@ -47,6 +47,14 @@ def get_device_conn_params(device):
 def index():
     return render_template('dashboard.html')
 
+@app.route('/traffic')
+def traffic_page():
+    return render_template('traffic.html')
+
+@app.route('/settings')
+def settings_page():
+    return render_template('settings.html')
+
 @app.route('/api/health')
 def api_health():
     """Health check endpoint"""
@@ -193,6 +201,150 @@ def api_removelimit(device_name, intf):
     except Exception as e:
         log.error(f"Remove limit failed: {device_name} — {intf}: {e}")
         return jsonify({'success': False, 'message': str(e)})
+
+# ── Settings API ─────────────────────────────────────────
+@app.route('/api/settings/config', methods=['GET'])
+def api_get_config():
+    """อ่าน config.yaml"""
+    try:
+        with open('config/config.yaml', 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/settings/config', methods=['POST'])
+def api_save_config():
+    """บันทึก config.yaml"""
+    try:
+        new_config = request.json
+        if not new_config:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+
+        # Validate essential fields
+        if 'model' not in new_config or 'collector' not in new_config:
+            return jsonify({'success': False, 'message': 'Missing required sections: model, collector'}), 400
+
+        with open('config/config.yaml', 'w', encoding='utf-8') as f:
+            yaml.dump(new_config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+        # Reload config in memory
+        global config
+        config = new_config
+
+        log.info("Config updated via web UI")
+        return jsonify({'success': True, 'message': 'Configuration saved'})
+    except Exception as e:
+        log.error("Failed to save config: %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/settings/devices', methods=['GET'])
+def api_get_devices():
+    """อ่าน devices.yaml"""
+    try:
+        with open('config/devices.yaml', 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/settings/devices', methods=['POST'])
+def api_save_devices():
+    """บันทึก devices.yaml"""
+    try:
+        new_devices = request.json
+        if not new_devices or 'devices' not in new_devices:
+            return jsonify({'success': False, 'message': 'Missing devices list'}), 400
+
+        with open('config/devices.yaml', 'w', encoding='utf-8') as f:
+            yaml.dump(new_devices, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+        # Reload devices config in memory
+        global devices_config
+        devices_config = new_devices
+
+        log.info("Devices config updated via web UI")
+        return jsonify({'success': True, 'message': 'Devices configuration saved'})
+    except Exception as e:
+        log.error("Failed to save devices config: %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/settings/env', methods=['GET'])
+def api_get_env():
+    """อ่าน .env (ซ่อน sensitive values)"""
+    try:
+        env_data = {
+            'DB_URL': os.getenv('DB_URL', ''),
+            'DISCORD_TOKEN': '••••••••' if os.getenv('DISCORD_TOKEN') else '',
+            'DISCORD_CHANNEL_ID': os.getenv('DISCORD_CHANNEL_ID', ''),
+            'DEVICE_USERNAME': os.getenv('DEVICE_USERNAME', ''),
+            'DEVICE_PASSWORD': '••••••••' if os.getenv('DEVICE_PASSWORD') else '',
+            'DEVICE_SECRET': '••••••••' if os.getenv('DEVICE_SECRET') else '',
+            'SNMP_COMMUNITY': os.getenv('SNMP_COMMUNITY', ''),
+            'SNMP_V3_USER': os.getenv('SNMP_V3_USER', ''),
+            'SNMP_V3_AUTH': '••••••••' if os.getenv('SNMP_V3_AUTH') else '',
+            'SNMP_V3_PRIV': '••••••••' if os.getenv('SNMP_V3_PRIV') else '',
+        }
+        return jsonify({'success': True, 'data': env_data})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/settings/env', methods=['POST'])
+def api_save_env():
+    """บันทึก .env"""
+    try:
+        new_env = request.json
+        if not new_env:
+            return jsonify({'success': False, 'message': 'No data provided'}), 400
+
+        # Read existing .env to preserve values not sent
+        existing = {}
+        if os.path.exists('.env'):
+            with open('.env', 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, val = line.split('=', 1)
+                        existing[key.strip()] = val.strip()
+
+        # Only update values that are not masked
+        for key, val in new_env.items():
+            if val and val != '••••••••':
+                existing[key] = val
+
+        # Write .env
+        lines = [
+            '# ── NetSentinel AI — Environment Variables ──────────────────',
+            '',
+            '# Database',
+            f'DB_URL={existing.get("DB_URL", "")}',
+            '',
+            '# Discord',
+            f'DISCORD_TOKEN={existing.get("DISCORD_TOKEN", "")}',
+            f'DISCORD_CHANNEL_ID={existing.get("DISCORD_CHANNEL_ID", "")}',
+            '',
+            '# Device Credentials',
+            f'DEVICE_USERNAME={existing.get("DEVICE_USERNAME", "")}',
+            f'DEVICE_PASSWORD={existing.get("DEVICE_PASSWORD", "")}',
+            f'DEVICE_SECRET={existing.get("DEVICE_SECRET", "")}',
+            '',
+            '# SNMP',
+            f'SNMP_COMMUNITY={existing.get("SNMP_COMMUNITY", "")}',
+            '',
+            '# SNMPv3 Configuration',
+            f'SNMP_V3_USER={existing.get("SNMP_V3_USER", "")}',
+            f'SNMP_V3_AUTH={existing.get("SNMP_V3_AUTH", "")}',
+            f'SNMP_V3_PRIV={existing.get("SNMP_V3_PRIV", "")}',
+            '',
+        ]
+        with open('.env', 'w', encoding='utf-8') as f:
+            f.write('\n'.join(lines))
+
+        log.info("Environment variables updated via web UI")
+        return jsonify({'success': True, 'message': 'Environment saved (restart required for some changes)'})
+    except Exception as e:
+        log.error("Failed to save .env: %s", e)
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 # ── SocketIO — push alerts real-time ─────────────────────
 def push_anomaly(anomaly):

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NetSentinel AI — Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #12141c; --card: #1c1f2b; --brd: #2a2e3f;
+  --txt: #f8fafc; --txt-m: #94a3b8;
+  --ac: #6366f1; --ac-h: #818cf8; --ac-bg: rgba(99,102,241,0.15);
+  --ok: #10b981; --ok-bg: rgba(16,185,129,0.15);
+  --err: #ef4444; --err-bg: rgba(239,68,68,0.15);
+  --wrn: #f59e0b; --wrn-bg: rgba(245,158,11,0.15);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--txt); min-height: 100vh; display: flex; flex-direction: row; margin: 0; }
+.sidebar { width: 260px; background: var(--card); border-right: 1px solid var(--brd); display: flex; flex-direction: column; padding: 1.5rem 1rem; transition: width 0.3s ease; flex-shrink: 0; height: 100vh; position: sticky; top: 0; z-index: 200; }
+.sidebar.collapsed { width: 88px; }
+.sidebar.collapsed .nav-text, .sidebar.collapsed .logo-text { display: none; }
+.sidebar.collapsed .logo { justify-content: center; }
+.sidebar-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; padding: 0 0.5rem; height: 32px; position: relative; }
+.sidebar.collapsed .sidebar-top { justify-content: center; }
+.logo { font-size: 1.1rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; letter-spacing: -0.02em; white-space: nowrap; }
+.logo-icon { width: 32px; height: 32px; background: var(--ac); border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; }
+.toggle-btn { background: var(--bg); border: 1px solid var(--brd); color: var(--txt); width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
+.sidebar.collapsed .sidebar-top .toggle-btn { display: grid; position: absolute; right: -24px; top: 0; border-radius: 50%; width: 28px; height: 28px; background: var(--card); }
+.sidebar.collapsed .sidebar-top .toggle-btn svg { transform: rotate(180deg); }
+.nav-menu { display: flex; flex-direction: column; gap: 0.5rem; }
+.nav-menu.bottom { margin-top: auto; }
+.nav-menu a { display: flex; align-items: center; gap: 1rem; color: var(--txt-m); text-decoration: none; font-size: 0.9rem; font-weight: 500; padding: 0.75rem 1rem; border-radius: 12px; transition: all 0.2s; white-space: nowrap; position: relative; }
+.nav-menu a:hover { background: rgba(255,255,255,0.03); color: var(--txt); }
+.nav-menu a.active { background: #fff; color: #000; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.sidebar.collapsed .nav-menu a { padding: 0.75rem; justify-content: center; }
+.nav-menu a svg { flex-shrink: 0; }
+.sidebar.collapsed .nav-menu a:hover::after {
+  content: attr(data-tooltip); position: absolute; left: calc(100% + 10px); background: #fff; color: #000; padding: 0.5rem 0.8rem; border-radius: 8px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,0.1); pointer-events: none; z-index: 1000;
+}
+.main-content { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100vh; overflow-y: auto; }
+.page-header { padding: 1.5rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: rgba(18, 20, 28, 0.8); backdrop-filter: blur(12px); z-index: 100; border-bottom: 1px solid var(--brd); }
+.page-title { font-size: 1.25rem; font-weight: 600; }
+.container { max-width: 1400px; margin: 2rem auto; padding: 0 2rem; display: flex; flex-direction: column; gap: 1.5rem; flex: 1; min-height: 0; width: 100%; }
+
+/* Settings specific */
+.settings-tabs { display: flex; gap: 1rem; border-bottom: 1px solid var(--brd); margin-bottom: 1.5rem; }
+.tab-btn { background: none; border: none; color: var(--txt-m); font-family: inherit; font-size: 0.95rem; font-weight: 500; padding: 0.75rem 1rem; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+.tab-btn:hover { color: var(--txt); }
+.tab-btn.active { color: var(--ac); border-bottom-color: var(--ac); }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+.card { background: var(--card); border: 1px solid var(--brd); border-radius: 12px; padding: 2rem; }
+.form-group { margin-bottom: 1.5rem; }
+.form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--txt-m); margin-bottom: 0.5rem; }
+.form-control { width: 100%; background: var(--bg); border: 1px solid var(--brd); color: var(--txt); padding: 0.75rem 1rem; border-radius: 8px; font-family: inherit; font-size: 0.9rem; transition: border-color 0.2s; }
+.form-control:focus { outline: none; border-color: var(--ac); box-shadow: 0 0 0 3px var(--ac-bg); }
+.form-row { display: flex; gap: 1.5rem; }
+.form-row .form-group { flex: 1; }
+
+.btn { background: var(--ac); color: #fff; border: none; padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.5rem; }
+.btn:hover { background: var(--ac-h); }
+.btn-save { width: 100%; justify-content: center; margin-top: 1rem; }
+
+textarea.form-control { resize: vertical; min-height: 200px; font-family: monospace; font-size: 0.85rem; line-height: 1.5; }
+
+/* Toast */
+.toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--card); border: 1px solid var(--brd); padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 1rem; transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 1000; }
+.toast.show { transform: translateY(0); opacity: 1; }
+.t-i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; }
+.t-i.s { background: var(--ok); color: #fff; }
+.t-i.e { background: var(--err); color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-top">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
+      <span class="logo-text">NetSentinel <span style="color:var(--ac)">AI</span></span>
+    </div>
+    <button class="toggle-btn" onclick="toggleSidebar()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </button>
+  </div>
+  
+  <div class="nav-menu">
+    <a href="/" data-tooltip="Dashboard">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+      <span class="nav-text">Dashboard</span>
+    </a>
+    <a href="#" data-tooltip="Calendar">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+      <span class="nav-text">Calendar</span>
+    </a>
+    <a href="#" data-tooltip="Notifications">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+      <span class="nav-text">Notifications</span>
+    </a>
+    <a href="/traffic" data-tooltip="Analytics">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+      <span class="nav-text">Analytics</span>
+    </a>
+    <a href="#" data-tooltip="Bookmarks">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+      <span class="nav-text">Bookmarks</span>
+    </a>
+    <a href="/settings" class="active" data-tooltip="Settings">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      <span class="nav-text">Settings</span>
+    </a>
+  </div>
+  
+  <div class="nav-menu bottom">
+    <a href="#" data-tooltip="Profile">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+      <span class="nav-text">Profile</span>
+    </a>
+    <a href="#" data-tooltip="Logout">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+      <span class="nav-text">Logout</span>
+    </a>
+  </div>
+</div>
+
+<div class="main-content">
+  <div class="page-header">
+    <div class="page-title">Settings</div>
+  </div>
+
+  <div class="container" style="max-width: 900px; margin: 2rem auto;">
+    
+    <div class="settings-tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-general')">General</button>
+      <button class="tab-btn" onclick="switchTab('tab-devices')">Devices</button>
+      <button class="tab-btn" onclick="switchTab('tab-env')">Environment Variables</button>
+    </div>
+
+    <!-- General Settings -->
+    <div id="tab-general" class="tab-content active">
+      <div class="card">
+        <h3 style="margin-bottom: 1.5rem; font-size: 1.1rem;">Collector & Data</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Collector Interval (seconds)</label>
+            <input type="number" id="cfg-interval" class="form-control" placeholder="60">
+          </div>
+          <div class="form-group">
+            <label>Data Retention (days)</label>
+            <input type="number" id="cfg-retention" class="form-control" placeholder="30">
+          </div>
+        </div>
+
+        <h3 style="margin-bottom: 1.5rem; margin-top: 1rem; font-size: 1.1rem;">AI Model Thresholds</h3>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Threshold Load (0-255)</label>
+            <input type="number" id="cfg-th-load" class="form-control" placeholder="20">
+          </div>
+          <div class="form-group">
+            <label>Threshold Reliability (0-255)</label>
+            <input type="number" id="cfg-th-rel" class="form-control" placeholder="200">
+          </div>
+          <div class="form-group">
+            <label>Threshold Errors</label>
+            <input type="number" id="cfg-th-err" class="form-control" placeholder="10">
+          </div>
+        </div>
+
+        <h3 style="margin-bottom: 1.5rem; margin-top: 1rem; font-size: 1.1rem;">Advanced YAML Config</h3>
+        <div class="form-group">
+          <label>Full config.yaml (You can edit directly)</label>
+          <textarea id="cfg-raw" class="form-control" spellcheck="false"></textarea>
+        </div>
+        <button class="btn btn-save" onclick="saveConfig()">Save General Settings</button>
+      </div>
+    </div>
+
+    <!-- Devices Settings -->
+    <div id="tab-devices" class="tab-content">
+      <div class="card">
+        <h3 style="margin-bottom: 1.5rem; font-size: 1.1rem;">Devices YAML Configuration</h3>
+        <div class="form-group">
+          <label>Edit devices.yaml (YAML format)</label>
+          <textarea id="dev-raw" class="form-control" style="min-height: 400px;" spellcheck="false"></textarea>
+        </div>
+        <button class="btn btn-save" onclick="saveDevices()">Save Devices Configuration</button>
+      </div>
+    </div>
+
+    <!-- Environment Settings -->
+    <div id="tab-env" class="tab-content">
+      <div class="card">
+        <h3 style="margin-bottom: 1.5rem; font-size: 1.1rem;">Environment Variables (.env)</h3>
+        <p style="color: var(--txt-m); font-size: 0.85rem; margin-bottom: 1.5rem;">Note: Passwords and Tokens are hidden for security. Enter a new value to update them, or leave empty/masked to keep existing values. Changes require application restart to take full effect.</p>
+        
+        <div class="form-group">
+          <label>Discord Bot Token</label>
+          <input type="text" id="env-discord-token" class="form-control" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+          <label>Discord Channel ID</label>
+          <input type="text" id="env-discord-channel" class="form-control">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Default Device Username</label>
+            <input type="text" id="env-dev-user" class="form-control">
+          </div>
+          <div class="form-group">
+            <label>Default Device Password</label>
+            <input type="text" id="env-dev-pass" class="form-control" placeholder="••••••••">
+          </div>
+          <div class="form-group">
+            <label>Default Enable Secret</label>
+            <input type="text" id="env-dev-sec" class="form-control" placeholder="••••••••">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>SNMP Community</label>
+          <input type="text" id="env-snmp-com" class="form-control">
+        </div>
+
+        <button class="btn btn-save" onclick="saveEnv()">Save Environment Variables</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  sidebar.classList.toggle('collapsed');
+}
+
+function switchTab(tabId) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+function showToast(msg, isError=false) {
+  const t = document.createElement('div');
+  t.className = 'toast show';
+  const icon = isError ? `<div class="t-i e"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>` : `<div class="t-i s"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>`;
+  t.innerHTML = icon + '<div style="font-size:0.85rem;font-weight:500">' + msg + '</div>';
+  document.body.appendChild(t);
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+// Data loading
+async function loadData() {
+  try {
+    // Config
+    let res = await fetch('/api/settings/config');
+    let data = await res.json();
+    if(data.success) {
+      document.getElementById('cfg-interval').value = data.data.collector.interval;
+      document.getElementById('cfg-retention').value = data.data.data_retention.days;
+      document.getElementById('cfg-th-load').value = data.data.model.threshold_load;
+      document.getElementById('cfg-th-rel').value = data.data.model.threshold_reliability;
+      document.getElementById('cfg-th-err').value = data.data.model.threshold_errors;
+      // Also dump to raw text (simple stringify for view)
+      document.getElementById('cfg-raw').value = JSON.stringify(data.data, null, 2);
+    }
+
+    // Devices
+    res = await fetch('/api/settings/devices');
+    data = await res.json();
+    if(data.success) {
+      document.getElementById('dev-raw').value = JSON.stringify(data.data, null, 2);
+    }
+
+    // Env
+    res = await fetch('/api/settings/env');
+    data = await res.json();
+    if(data.success) {
+      const e = data.data;
+      document.getElementById('env-discord-token').value = e.DISCORD_TOKEN;
+      document.getElementById('env-discord-channel').value = e.DISCORD_CHANNEL_ID;
+      document.getElementById('env-dev-user').value = e.DEVICE_USERNAME;
+      document.getElementById('env-dev-pass').value = e.DEVICE_PASSWORD;
+      document.getElementById('env-dev-sec').value = e.DEVICE_SECRET;
+      document.getElementById('env-snmp-com').value = e.SNMP_COMMUNITY;
+    }
+  } catch(e) {
+    showToast('Failed to load settings', true);
+  }
+}
+
+// Save Config
+async function saveConfig() {
+  try {
+    // Parse raw JSON first to maintain other fields
+    let fullCfg = JSON.parse(document.getElementById('cfg-raw').value);
+    
+    // Override with form values
+    fullCfg.collector.interval = parseInt(document.getElementById('cfg-interval').value) || 60;
+    fullCfg.data_retention.days = parseInt(document.getElementById('cfg-retention').value) || 30;
+    fullCfg.model.threshold_load = parseInt(document.getElementById('cfg-th-load').value) || 20;
+    fullCfg.model.threshold_reliability = parseInt(document.getElementById('cfg-th-rel').value) || 200;
+    fullCfg.model.threshold_errors = parseInt(document.getElementById('cfg-th-err').value) || 10;
+
+    const res = await fetch('/api/settings/config', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(fullCfg)
+    });
+    const data = await res.json();
+    if(data.success) showToast('Config saved successfully');
+    else showToast(data.message, true);
+  } catch(e) {
+    showToast('Invalid JSON in raw config text area', true);
+  }
+}
+
+// Save Devices
+async function saveDevices() {
+  try {
+    const devData = JSON.parse(document.getElementById('dev-raw').value);
+    const res = await fetch('/api/settings/devices', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(devData)
+    });
+    const data = await res.json();
+    if(data.success) showToast('Devices saved successfully');
+    else showToast(data.message, true);
+  } catch(e) {
+    showToast('Invalid JSON format', true);
+  }
+}
+
+// Save Env
+async function saveEnv() {
+  try {
+    const payload = {
+      DISCORD_TOKEN: document.getElementById('env-discord-token').value,
+      DISCORD_CHANNEL_ID: document.getElementById('env-discord-channel').value,
+      DEVICE_USERNAME: document.getElementById('env-dev-user').value,
+      DEVICE_PASSWORD: document.getElementById('env-dev-pass').value,
+      DEVICE_SECRET: document.getElementById('env-dev-sec').value,
+      SNMP_COMMUNITY: document.getElementById('env-snmp-com').value
+    };
+    const res = await fetch('/api/settings/env', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(data.success) showToast('Environment variables saved');
+    else showToast(data.message, true);
+  } catch(e) {
+    showToast('Error saving env', true);
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>

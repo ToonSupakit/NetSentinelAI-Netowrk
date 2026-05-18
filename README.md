@@ -6,6 +6,34 @@
 
 ---
 
+## Screenshots
+
+### Dashboard — สถานะปกติ
+<!-- ![Dashboard Normal](screenshots/dashboard_normal.png) -->
+
+### Dashboard — ตอนมี Anomaly
+<!-- ![Dashboard Anomaly](screenshots/dashboard_anomaly.png) -->
+
+### Discord — แจ้งเตือน Anomaly พร้อมปุ่มกด
+<!-- ![Discord Alert](screenshots/discord_alert.png) -->
+
+### Discord — สั่ง Fix สำเร็จ
+<!-- ![Discord Fix](screenshots/discord_fix.png) -->
+
+### Discord — คำสั่ง !analytics
+<!-- ![Discord Analytics](screenshots/discord_analytics.png) -->
+
+### Terminal — Log ตอนรันปกติ
+<!-- ![Terminal Normal](screenshots/terminal_normal.png) -->
+
+### Terminal — Log ตอนพบ Anomaly
+<!-- ![Terminal Anomaly](screenshots/terminal_anomaly.png) -->
+
+### GNS3 — Topology ที่ใช้ทดสอบ
+<!-- ![GNS3 Topology](screenshots/gns3_topology.png) -->
+
+---
+
 ## สิ่งที่ระบบทำได้
 
 - เก็บข้อมูล interface (status, reliability, TX/RX load, errors) จาก Router ผ่าน SNMP ทุก 60 วินาที
