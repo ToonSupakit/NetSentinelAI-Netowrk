@@ -1,276 +1,244 @@
-# 🤖 Network AI Monitor v2
+# NetSentinel AI
 
-A real-time network anomaly detection and auto-remediation system using Machine Learning + Discord Bot, connected to Cisco Routers via GNS3. Built as my final year project.
+ระบบตรวจจับความผิดปกติบนเครือข่าย Cisco แบบ Real-time
 
----
-
-## 📌 Project Overview
-
-```
-Cisco Routers (GNS3)
-        ↓  Netmiko / Telnet
-collector.py  →  MySQL Database
-        ↓
-predictor.py  →  Random Forest AI Model
-        ↓
-bot.py  →  Discord Bot (Alert + Auto-Fix)
-```
+ดึงข้อมูลจาก Router ผ่าน SNMP → วิเคราะห์ด้วย Rule-based + Isolation Forest → แจ้งเตือนผ่าน Discord Bot → สั่งแก้ไขจากปุ่มกดได้เลย พร้อม Dashboard แสดงสถานะ
 
 ---
 
-## 🛠️ Tech Stack
+## สิ่งที่ระบบทำได้
 
-| Component | Technology |
-|---|---|
-| Network Simulation | GNS3 + VMware |
-| Router | Cisco IOS (4 Routers) |
-| Routing Protocol | OSPF |
-| Data Collection | Python + Netmiko |
-| Database | MySQL |
-| Machine Learning | scikit-learn (Random Forest) |
-| DB Connection | SQLAlchemy |
-| Config Management | YAML |
-| ChatOps | Discord.py |
+- เก็บข้อมูล interface (status, reliability, TX/RX load, errors) จาก Router ผ่าน SNMP ทุก 60 วินาที
+- วิเคราะห์ด้วย 2 ระบบคู่ขนาน: Rule-based threshold + Isolation Forest AI
+- แจ้งเตือน anomaly ผ่าน Discord พร้อมปุ่มกดสั่ง fix, rate limit, check status
+- Dashboard เว็บแสดงสถานะ interface, กราฟ traffic, ประวัติ anomaly
+- เทรน AI ใหม่อัตโนมัติทุก 24 ชั่วโมง
+- รองรับ SNMPv2c และ SNMPv3 (SHA/AES)
+- ปุ่มกดใน Discord จำกัดเฉพาะ Admin เท่านั้น
 
 ---
 
-## 📁 Project Structure
+## โครงสร้างโปรเจค
 
 ```
-network-ai-v2/
-├── main.py               # Entry point — runs collector + bot together
-├── collector.py          # Collects interface data from all routers
-├── predictor.py          # AI prediction + anomaly analysis
-├── bot.py                # Discord Bot — alerts + buttons
-├── db.py                 # Database operations
-├── train_model.py        # Train the AI model
-├── devices.yaml          # Router config (add new routers here)
-├── config.yaml           # System config (thresholds, DB, Discord)
-└── anomaly_model_v2.pkl  # Trained AI model
+├── main.py                  # จุดเริ่มต้น รันทุก thread
+├── train_model.py           # เทรน AI Model
+├── requirements.txt
+├── .env                     # ค่าลับ (ไม่ขึ้น git)
+│
+├── app/
+│   ├── collector.py         # ดึงข้อมูลจาก Router ผ่าน SNMP
+│   ├── snmp_helper.py       # SNMP v2c/v3 + กรองค่าขยะ GNS3
+│   ├── predictor.py         # Rules + AI วิเคราะห์คู่ขนาน
+│   ├── bot.py               # Discord Bot
+│   ├── db.py                # MySQL (SQLAlchemy)
+│   └── runtime.py           # Shutdown flag
+│
+├── web/
+│   ├── dashboard.py         # Flask + SocketIO
+│   └── templates/
+│       └── dashboard.html
+│
+├── config/
+│   ├── config.yaml          # Threshold, interval (ไม่ขึ้น git)
+│   └── devices.yaml         # รายการ Router (ไม่ขึ้น git)
+│
+└── models/
+    └── anomaly_model_v2.pkl # AI Model (ไม่ขึ้น git)
 ```
 
 ---
 
-## 🌐 Network Topology
+## ต้องมีอะไรบ้าง
 
-Mid-scale enterprise network with 4 routers, 2 switches, and 6 PCs — fully meshed with redundant paths.
-
-```
-PC1, PC2, PC3
-      ↓
-   Switch1 (192.168.1.x)
-      ↓
-     R2 (192.168.189.10) ←→ R1 ←→ R3 ←→ R4 (192.168.189.20)
-                                              ↓
-                                          Switch2 (192.168.2.x)
-                                              ↓
-                                     PC4, PC5, PC6
-```
-
-| Device | Management IP | Role |
-|---|---|---|
-| R1 | 10.10.100.1 (Loopback) | Core Router |
-| R2 | 192.168.189.10 | Core + DHCP + NAT |
-| R3 | 10.10.100.3 (Loopback) | Core Router |
-| R4 | 192.168.189.20 | Core + DHCP + NAT |
+- Python 3.10+
+- MySQL 8.0+
+- GNS3 พร้อม Cisco IOS image
+- Discord Bot Token (สร้างจาก https://discord.com/developers/applications)
 
 ---
 
-## ⚙️ Installation
-
-### 1. Install Python Libraries
+## วิธีติดตั้ง
 
 ```bash
-pip install netmiko sqlalchemy mysql-connector-python pyyaml scikit-learn pandas joblib discord.py
+git clone https://github.com/YOUR_USERNAME/network-ai-v2-web.git
+cd network-ai-v2-web
+pip install -r requirements.txt
 ```
 
-### 2. Create Database
+สร้าง Database:
 
 ```sql
-CREATE DATABASE network_ai_v2;
+CREATE DATABASE network_ai_v2 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-### 3. Configure Files
+Copy ไฟล์ config แล้วแก้ค่า:
 
-Edit `config.yaml`:
-```yaml
-database:
-  url: "mysql+mysqlconnector://root:@localhost/network_ai_v2"
-
-model:
-  path: "anomaly_model_v2.pkl"
-  threshold_load: 20
-  threshold_reliability: 200
-  threshold_errors: 10
-
-collector:
-  interval: 10
-
-discord:
-  token: "YOUR_BOT_TOKEN"
-  channel_id: YOUR_CHANNEL_ID
+```bash
+cp .env.example .env
+cp config/config.example.yaml config/config.yaml
+cp config/devices.example.yaml config/devices.yaml
 ```
 
-Edit `devices.yaml` — add new routers here without touching code:
+---
+
+## Configuration
+
+### `.env`
+
+```env
+DB_URL=mysql+mysqlconnector://root:รหัสผ่าน@localhost/network_ai_v2
+
+DISCORD_TOKEN=token_ของบอท
+DISCORD_CHANNEL_ID=channel_id
+
+DEVICE_USERNAME=admin
+DEVICE_PASSWORD=admin123
+DEVICE_SECRET=admin123
+
+SNMP_COMMUNITY=public
+
+# SNMPv3 (ถ้าไม่ใส่จะใช้ v2c)
+# SNMP_V3_USER=netsentinel
+# SNMP_V3_AUTH=admin12345
+# SNMP_V3_PRIV=admin12345
+```
+
+### `config/devices.yaml`
+
+ใส่ Router ที่จะมอนิเตอร์ เพิ่มกี่ตัวก็ได้:
+
 ```yaml
 devices:
   - name: R1
     host: 10.10.100.1
     device_type: cisco_ios_telnet
-    username: admin
-    password: admin123
-    secret: admin123
     location: Core
     zone: A
-  # Add more routers here...
+
+  - name: R2
+    host: 192.168.189.10
+    device_type: cisco_ios_telnet
+    location: Core
+    zone: Core
+```
+
+### `config/config.yaml`
+
+ปรับ threshold ตามต้องการ:
+
+```yaml
+model:
+  threshold_load: 20          # rxload/txload > 20 = anomaly (0-255)
+  threshold_reliability: 200  # reliability < 200 = anomaly
+  threshold_errors: 10        # input errors > 10 = anomaly
+  retrain_interval_hours: 24
+
+collector:
+  interval: 60                # เก็บข้อมูลทุก 60 วินาที
 ```
 
 ---
 
-## 🚀 How to Use
+## Config Router ใน GNS3
 
-### Step 1 — Run the System
+ทุกตัวต้อง config SNMP:
+
+```
+conf t
+snmp-server community public ro
+exit
+wr
+```
+
+ถ้าจะใช้ SNMPv3:
+
+```
+conf t
+no snmp-server community public ro
+snmp-server group V3Group v3 priv read v3view
+snmp-server view v3view iso included
+snmp-server user netsentinel V3Group v3 auth sha admin12345 priv aes 128 admin12345
+exit
+wr
+```
+
+ถ้าจะใช้ปุ่ม Fix/Rate Limit ต้อง config Telnet ด้วย:
+
+```
+conf t
+enable secret admin123
+username admin privilege 15 secret admin123
+line vty 0 4
+ login local
+ transport input telnet
+exit
+wr
+```
+
+---
+
+## วิธีใช้
 
 ```bash
+# รันระบบ (ตาราง DB สร้างอัตโนมัติ)
+python main.py
+
+# รอเก็บข้อมูลสัก 10 นาที แล้วเทรน AI
+python train_model.py
+
+# รีสตาร์ทเพื่อโหลด model ใหม่
 python main.py
 ```
 
-This starts everything at once — data collection, AI prediction, and Discord Bot.
+- Dashboard: http://localhost:5000
+- หลังจากนี้ AI จะเทรนใหม่เองทุก 24 ชั่วโมง
 
-### Step 2 — Train the AI Model
+### เปลี่ยน Topology
 
-```bash
-python train_model.py
-```
-
-Expected output:
-```
-✅ Loaded data: 3816 rows
-📈 Classification Report:
-              precision    recall  f1-score
-     anomaly       1.00      1.00      1.00
-      normal       1.00      1.00      1.00
-    accuracy                           1.00
-⭐ Feature Importance:
-network_load    0.225
-input_errors    0.199
-reliability     0.196
-rxload          0.196
-protocol_num    0.183
-```
+แก้ `config/devices.yaml` → config SNMP บน Router ใหม่ → รัน `python main.py` → รอสักพักแล้ว `python train_model.py`
 
 ---
 
-## 🤖 AI Model Details
+## Discord Bot Commands
 
-| Detail | Value |
-|---|---|
-| Algorithm | Random Forest |
-| Number of Trees | 100 |
-| Training Data | 3,052 rows |
-| Test Data | 764 rows |
-| Accuracy | 100% |
-| Features Used | 6 features |
+| คำสั่ง | ทำอะไร |
+|--------|--------|
+| `!status` | ดูสถานะ interface ทั้งหมด |
+| `!history` | ดู anomaly 10 รายการล่าสุด |
+| `!analytics` | สรุป anomaly, uptime, traffic |
+| `!help` | ดูคำสั่งทั้งหมด |
 
-### Features Used for Training
-
-| Feature | Description | Importance |
-|---|---|---|
-| network_load | Outbound traffic (0-255) | 22.5% |
-| input_errors | Error count | 19.9% |
-| reliability | Link stability (0-255) | 19.6% |
-| rxload | Inbound traffic (0-255) | 19.6% |
-| protocol_num | Protocol up/down | 18.3% |
-| status_num | Port up/down | 0% |
-
-### Anomaly Rules
-
-| Condition | Label |
-|---|---|
-| protocol = down | anomaly |
-| status = admin_down | anomaly |
-| network_load > threshold | anomaly |
-| rxload > threshold | anomaly |
-| reliability < threshold | anomaly |
-| input_errors > threshold | anomaly |
+ปุ่มกดบน alert (เฉพาะ Admin): Approve Fix, Rate Limit, Remove Limit, Check Status, Ignore
 
 ---
 
-## 🔔 Discord Bot Commands
+## AI Model
 
-| Command | Description |
-|---|---|
-| `!status` | Show current status of all interfaces |
-| `!history` | Show last 10 anomaly records |
-| `!analytics` | Full analytics — anomaly summary, uptime, fix rate, traffic trend |
-| `!help` | Show all available commands |
+ใช้ **Isolation Forest** เรียนรู้จากข้อมูลปกติ แล้วจับ pattern ที่ผิดแปลกออกมา
 
-### Anomaly Alert Buttons
-
-When an anomaly is detected, the bot sends an alert with action buttons:
-
-| Button | Action |
-|---|---|
-| 🔧 Fix Now | Runs `no shutdown` automatically on the affected interface |
-| 📊 Check Status | Shows live interface status via `show interface` |
-| 🚦 Rate Limit | Applies 50Mbps rate limit for high traffic |
-| 🔓 Remove Limit | Removes rate limit after traffic normalizes |
-| ❌ Ignore | Dismisses the alert |
+ทำงานคู่ขนานกับ Rules ทุกรอบ:
+- `rules+ai` — ทั้งสองเห็นตรงกัน
+- `rules` — เฉพาะ rules เจอ
+- `ai` — เฉพาะ AI เจอ (pattern แปลกที่ rules ไม่มีกฎครอบคลุม)
+- `healthy` — ผ่านทั้งคู่
 
 ---
 
-## 📊 Analytics Dashboard (!analytics)
+## API
 
-- **Overview** — Total records, anomaly count, fix rate, today's anomalies
-- **Device Uptime** — Uptime % per device (🟢 ≥99% / 🟡 ≥95% / 🔴 <95%)
-- **Top Problem Devices & Interfaces** — Ranked by anomaly count
-- **Traffic Trend** — Avg/max load per hour (last 6 hours)
-- **Anomaly by Type** — High Traffic / Admin Down / Protocol Down breakdown
-
----
-
-## 🔧 Customization
-
-### Add a New Router
-
-Just add one entry in `devices.yaml` — no code changes needed:
-
-```yaml
-- name: R5
-  host: 192.168.189.30
-  device_type: cisco_ios_telnet
-  username: admin
-  password: admin123
-  secret: admin123
-  location: Core
-  zone: C
-```
-
-### Change Monitoring Interval
-
-```yaml
-collector:
-  interval: 10  # seconds
-```
+| Method | Endpoint | คำอธิบาย |
+|--------|----------|---------|
+| GET | `/api/status` | สถานะ interface ล่าสุด |
+| GET | `/api/anomalies` | ประวัติ anomaly |
+| GET | `/api/analytics` | สรุปสถิติ |
+| GET | `/api/traffic` | Traffic trend 1 ชั่วโมง |
+| POST | `/api/fix/<device>/<intf>` | สั่ง no shutdown |
+| POST | `/api/ratelimit/<device>/<intf>` | ใส่ rate limit |
+| POST | `/api/removelimit/<device>/<intf>` | ถอด rate limit |
 
 ---
 
-## 📈 Future Improvements
+## License
 
-- [ ] Web Dashboard (Flask + Chart.js)
-- [ ] SSH support instead of Telnet
-- [ ] SNMP polling for deeper metrics
-- [ ] Email / Line notification
-- [ ] Support for larger topologies (EVE-NG)
-
----
-
-## 👨‍💻 About
-
-Built as a final year project exploring the intersection of AI and Network Automation. The goal was to create a practical system that can monitor, detect, and auto-remediate network issues in real time.
-
----
-
-## 📄 License
-
-MIT License
+This project is for educational purposes.

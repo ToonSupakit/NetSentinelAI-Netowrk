@@ -1,0 +1,41 @@
+# ── NetSentinel AI — Example Config ─────────────────────────
+# คัดลอกไฟล์นี้เป็น config.yaml แล้วแก้ค่าให้ตรงกับระบบของคุณ
+
+model:
+  path: "anomaly_model_v2.pkl"
+  threshold_load: 20
+  threshold_reliability: 200
+  threshold_errors: 10
+  # Isolation Forest training
+  contamination: 0.05
+  train_validation_fraction: 0.2
+  random_state: 42
+  # เทรนโมเดลใหม่ทุก N ชั่วโมง (main.py auto-retrain)
+  retrain_interval_hours: 24
+
+collector:
+  interval: 10
+
+data_retention:
+  enabled: true
+  days: 30
+
+# เปลี่ยน prefix ให้ตรงกับ topology ของคุณ
+link_types:
+  rules:
+    - prefix: "192.168.189"
+      type: Management
+    - prefix: "10.10."
+      type: Core
+    - prefix: "192.168.1."
+      type: LAN
+  default: Other
+
+anomaly:
+  skip_types:
+    - Serial
+    - Vlan
+    - NVI
+    - Loopback
+    - Tunnel
+    - Null

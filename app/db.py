@@ -2,13 +2,26 @@
 from sqlalchemy import create_engine, text  # ไลบรารีสำหรับจัดการฐานข้อมูล SQL
 from datetime import datetime  # สำหรับจัดการวันที่และเวลา
 import yaml  # สำหรับอ่านไฟล์การตั้งค่า
+import logging
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+log = logging.getLogger(__name__)
 
 # อ่านไฟล์การตั้งค่าจาก config.yaml
-with open('config.yaml', 'r', encoding='utf-8') as f:
+with open('config/config.yaml', 'r', encoding='utf-8') as f:
     config = yaml.safe_load(f)
 
-# สร้างการเชื่อมต่อกับฐานข้อมูล MySQL
-engine = create_engine(config['database']['url'])
+# สร้างการเชื่อมต่อกับฐานข้อมูล MySQL — อ่าน URL จาก .env
+DB_URL = os.getenv('DB_URL', config.get('database', {}).get('url', ''))
+engine = create_engine(
+    DB_URL,
+    pool_size=5,
+    max_overflow=10,
+    pool_recycle=3600,
+    pool_pre_ping=True
+)
 
 def init_db():
     """ฟังก์ชันสำหรับเริ่มต้นฐานข้อมูล สร้างตารางที่จำเป็น"""
@@ -43,6 +56,7 @@ def init_db():
                 interface_name   VARCHAR(50),
                 prediction_label VARCHAR(50),
                 confidence_score FLOAT,
+                detection_source VARCHAR(32) NULL,
                 is_fixed         BOOLEAN DEFAULT FALSE,
                 fixed_at         DATETIME,
                 predicted_at     DATETIME,
@@ -65,10 +79,63 @@ def init_db():
                 created_at  TIMESTAMP DEFAULT current_timestamp()
             )
         """))
-        conn.commit()
-    print("✅ Database initialized")
 
-# --- เพิ่มฟังก์ชัน get_analytics ตรงนี้ ---
+        # ── สร้าง Indexes เพื่อเพิ่มความเร็ว query ──────────────────────
+        index_statements = [
+            "CREATE INDEX idx_logs_device_intf_time ON interface_logs(device_name, interface_name, collected_at)",
+            "CREATE INDEX idx_logs_label ON interface_logs(label)",
+            "CREATE INDEX idx_logs_collected_at ON interface_logs(collected_at)",
+            "CREATE INDEX idx_pred_label_date ON ai_predictions(prediction_label, predicted_at)",
+            "CREATE INDEX idx_pred_log_id ON ai_predictions(log_id)",
+        ]
+        for stmt in index_statements:
+            try:
+                conn.execute(text(stmt))
+            except Exception:
+                pass  # index อาจมีอยู่แล้ว
+
+        conn.commit()
+    _migrate_ai_predictions_detection_source()
+    log.info("Database initialized with indexes")
+
+
+def _migrate_ai_predictions_detection_source():
+    """เพิ่มคอลัมน์ detection_source สำหรับฐานข้อมูลที่สร้างจากสคีมาเก่า"""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(
+                "ALTER TABLE ai_predictions ADD COLUMN detection_source VARCHAR(32) NULL"
+            ))
+            conn.commit()
+    except Exception:
+        pass
+
+
+def cleanup_old_data(days=30):
+    """ลบข้อมูลเก่ากว่า N วัน เพื่อไม่ให้ DB บวม"""
+    try:
+        with engine.connect() as conn:
+            # ลบ predictions เก่า
+            result1 = conn.execute(text("""
+                DELETE FROM ai_predictions
+                WHERE predicted_at < DATE_SUB(NOW(), INTERVAL :days DAY)
+            """), {"days": days})
+
+            # ลบ logs เก่าที่ไม่มี prediction อ้างอิง
+            result2 = conn.execute(text("""
+                DELETE FROM interface_logs
+                WHERE collected_at < DATE_SUB(NOW(), INTERVAL :days DAY)
+                  AND id NOT IN (SELECT log_id FROM ai_predictions)
+            """), {"days": days})
+
+            conn.commit()
+            total = result1.rowcount + result2.rowcount
+            if total > 0:
+                log.info(f"Cleanup: ลบข้อมูลเก่า {total} records (>{days} วัน)")
+    except Exception as e:
+        log.error(f"Cleanup error: {e}")
+
+
 def get_analytics():
     with engine.connect() as conn:
 
@@ -165,7 +232,7 @@ def get_analytics():
             'traffic_trend'   : traffic_trend,
             'anomaly_by_type' : anomaly_by_type
         }
-# --- จบส่วนที่เพิ่ม ---
+
 
 def save_log(device, intf, ip, status, proto, rel, tx, rx, err, ltype, zone, location, label):
     now = datetime.now()
@@ -188,16 +255,17 @@ def save_log(device, intf, ip, status, proto, rel, tx, rx, err, ltype, zone, loc
         conn.commit()
         return result.lastrowid
 
-def save_prediction(log_id, device, intf, prediction, confidence):
+def save_prediction(log_id, device, intf, prediction, confidence, detection_source=None):
     with engine.connect() as conn:
         conn.execute(text("""
             INSERT INTO ai_predictions
             (log_id, device_name, interface_name, prediction_label,
-             confidence_score, predicted_at)
-            VALUES (:log_id, :device, :intf, :label, :score, :now)
+             confidence_score, detection_source, predicted_at)
+            VALUES (:log_id, :device, :intf, :label, :score, :src, :now)
         """), {
             "log_id": log_id, "device": device, "intf": intf,
             "label": prediction, "score": confidence,
+            "src": detection_source,
             "now": datetime.now()
         })
         conn.commit()
@@ -207,7 +275,8 @@ def get_anomaly_history(limit=10):
         result = conn.execute(text("""
             SELECT p.predicted_at, p.device_name, p.interface_name,
                     p.prediction_label, p.confidence_score, p.is_fixed,
-                    l.status, l.protocol, l.network_load, l.rxload
+                    l.status, l.protocol, l.network_load, l.rxload,
+                    p.detection_source
             FROM ai_predictions p
             JOIN interface_logs l ON p.log_id = l.id
             WHERE p.prediction_label = 'anomaly'

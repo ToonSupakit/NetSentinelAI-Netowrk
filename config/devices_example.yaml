@@ -1,0 +1,21 @@
+# ── NetSentinel AI — Example Devices ────────────────────────
+# คัดลอกไฟล์นี้เป็น devices.yaml แล้วแก้ค่าให้ตรงกับอุปกรณ์ของคุณ
+#
+# username/password/secret ถ้าไม่ระบุจะใช้ค่าจาก .env
+# ถ้าอุปกรณ์มี credentials ต่างกัน สามารถระบุเฉพาะตัวได้
+
+devices:
+  - name: Router1
+    host: 192.168.1.1
+    device_type: cisco_ios_telnet
+    location: HQ
+    zone: Core
+
+  - name: Switch1
+    host: 192.168.1.2
+    device_type: cisco_ios
+    location: HQ
+    zone: LAN
+    # username: custom_user    # override ค่า default ได้
+    # password: custom_pass
+    # secret: custom_secret

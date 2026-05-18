@@ -1,0 +1,34 @@
+# ── NetSentinel AI — Device Configuration ──────────────────
+# คัดลอกไฟล์นี้เป็น devices.yaml แล้วแก้ค่าตาม topology ของคุณ
+# cp config/devices.example.yaml config/devices.yaml
+#
+# เพิ่มอุปกรณ์ใหม่: แค่ copy block ข้างล่างแล้วแก้ค่า
+# ไม่ต้องแตะโค้ดเลย รองรับ topology อะไรก็ได้
+#
+# device_type ที่รองรับ (netmiko):
+#   cisco_ios          — Cisco IOS (SSH)
+#   cisco_ios_telnet   — Cisco IOS (Telnet)
+#   cisco_nxos         — Cisco NX-OS
+#   mikrotik_routeros  — MikroTik RouterOS
+#   juniper_junos      — Juniper JunOS
+#   arista_eos         — Arista EOS
+#
+# username/password/secret:
+#   ถ้าไม่ระบุ จะใช้ค่า default จาก .env
+#
+# snmp_community:
+#   ถ้าไม่ระบุ จะใช้ค่า default จาก .env (SNMP_COMMUNITY)
+
+devices:
+  - name: R1
+    host: 10.10.100.1
+    device_type: cisco_ios_telnet
+    snmp_community: public
+    location: Core
+    zone: A
+
+  - name: R2
+    host: 192.168.189.10
+    device_type: cisco_ios_telnet
+    location: Core
+    zone: Core

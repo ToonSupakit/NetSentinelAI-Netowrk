@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NetSentinel AI — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #12141c; --card: #1c1f2b; --brd: #2a2e3f;
+  --txt: #f8fafc; --txt-m: #94a3b8;
+  --ac: #6366f1; --ac-h: #818cf8; --ac-bg: rgba(99,102,241,0.15);
+  --ok: #10b981; --ok-bg: rgba(16,185,129,0.15);
+  --err: #ef4444; --err-bg: rgba(239,68,68,0.15);
+  --wrn: #f59e0b; --wrn-bg: rgba(245,158,11,0.15);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--txt); min-height: 100%; min-height: 100dvh; padding-bottom: 2rem; display: flex; flex-direction: column; }
+.topbar { background: var(--card); border-bottom: 1px solid var(--brd); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; flex-shrink: 0; }
+.logo { font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: 0.75rem; letter-spacing: -0.02em; }
+.logo-icon { width: 32px; height: 32px; background: var(--ac); border-radius: 8px; display: grid; place-items: center; }
+.status-pill { font-size: 0.8rem; color: var(--txt-m); display: flex; align-items: center; gap: 0.5rem; background: var(--bg); padding: 0.4rem 0.8rem; border-radius: 20px; border: 1px solid var(--brd); }
+.dot { width: 6px; height: 6px; background: var(--ok); border-radius: 50%; box-shadow: 0 0 8px var(--ok); }
+.container { max-width: 1400px; margin: 2rem auto; padding: 0 2rem; display: flex; flex-direction: column; gap: 1.5rem; flex: 1; min-height: 0; width: 100%; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+.card { background: var(--card); border: 1px solid var(--brd); border-radius: 12px; padding: 1.5rem; }
+.stat-h { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--txt-m); font-weight: 600; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.stat-icon { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; }
+.stat-v { font-size: 2.25rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 0.25rem; }
+.stat-sub { font-size: 0.8rem; color: var(--txt-m); }
+.grid-23 { display: grid; grid-template-columns: 2fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 1.5rem; align-items: stretch; flex: 1; min-height: 0; }
+.layout-main { display: flex; flex-direction: column; gap: 1.5rem; min-height: 0; }
+.ch { font-size: 1rem; font-weight: 600; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; flex-shrink: 0; }
+.card-anomaly { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 0.85rem; }
+th { text-align: left; padding: 1rem; color: var(--txt-m); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--brd); }
+td { padding: 1rem; border-bottom: 1px solid rgba(42, 46, 63, 0.5); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,0.02); }
+.badge { padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 500; text-transform: capitalize; border: 1px solid transparent; }
+.b-n, .b-u { background: var(--ok-bg); color: var(--ok); border-color: rgba(16,185,129,0.2); }
+.b-a, .b-d { background: var(--err-bg); color: var(--err); border-color: rgba(239,68,68,0.2); }
+.lbw { display: flex; align-items: center; gap: 0.75rem; }
+.lb { flex: 1; height: 4px; background: var(--brd); border-radius: 2px; overflow: hidden; }
+.lbf { height: 100%; border-radius: 2px; transition: width 0.3s ease; }
+.bg-ok { background: var(--ok); } .bg-wrn { background: var(--wrn); } .bg-err { background: var(--err); }
+.btn { border: none; padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.2s; font-family: inherit; }
+.btn-f { background: var(--err-bg); color: var(--err); border: 1px solid rgba(239,68,68,0.3); }
+.btn-f:hover { background: var(--err); color: #fff; }
+.btn-l { background: var(--wrn-bg); color: var(--wrn); border: 1px solid rgba(245,158,11,0.3); margin-left: 0.5rem; }
+.btn-l:hover { background: var(--wrn); color: #fff; }
+.btn-r { background: transparent; color: var(--txt-m); border: 1px solid var(--brd); margin-left: 0.5rem; padding: 0.4rem; }
+.btn-r:hover { background: var(--brd); color: var(--txt); }
+.feed { display: flex; flex-direction: column; gap: 1rem; flex: 1; min-height: 0; overflow-y: auto; padding-right: 0.5rem; }
+.feed::-webkit-scrollbar { width: 6px; }
+.feed::-webkit-scrollbar-track { background: transparent; }
+.feed::-webkit-scrollbar-thumb { background: var(--brd); border-radius: 3px; }
+.fi { display: flex; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--brd); }
+.fi:last-child { border-bottom: none; padding-bottom: 0; }
+.fs { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0; }
+.fs.a { background: var(--err-bg); color: var(--err); }
+.fs.o { background: var(--ok-bg); color: var(--ok); }
+.fc { flex: 1; min-width: 0; }
+.ft { font-weight: 600; font-size: 0.85rem; margin-bottom: 0.25rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fsu { font-size: 0.75rem; color: var(--txt-m); }
+.ftime { font-size: 0.7rem; color: var(--txt-m); white-space: nowrap; }
+.toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--card); border: 1px solid var(--brd); padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 1rem; transform: translateY(100px); opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 1000; }
+.toast.show { transform: translateY(0); opacity: 1; }
+.t-i { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; }
+.t-i.s { background: var(--ok); color: #fff; }
+.t-i.e { background: var(--err); color: #fff; }
+.t-i.a { background: var(--ac); color: #fff; }
+.chart-container { height: 250px; width: 100%; margin-top: 1rem; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+    NetSentinel <span style="color:var(--ac)">AI</span>
+  </div>
+  <div class="status-pill"><div class="dot"></div><span id="last-update">Connecting...</span></div>
+</div>
+
+<div class="container">
+  <div class="grid-4">
+    <div class="card">
+      <div class="stat-h">Total Records <div class="stat-icon" style="background:var(--ac-bg);color:var(--ac)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div></div>
+      <div class="stat-v" id="c-tot">-</div>
+    </div>
+    <div class="card">
+      <div class="stat-h">Anomaly Today <div class="stat-icon" style="background:var(--err-bg);color:var(--err)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div></div>
+      <div class="stat-v" id="c-ano" style="color:var(--err)">-</div>
+    </div>
+    <div class="card">
+      <div class="stat-h">Total Normal <div class="stat-icon" style="background:var(--ok-bg);color:var(--ok)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+      <div class="stat-v" id="c-nor" style="color:var(--ok)">-</div>
+    </div>
+    <div class="card grid-2">
+      <div class="stat-h">Fix Rate <div class="stat-icon" style="background:var(--wrn-bg);color:var(--wrn)"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div></div>
+      <div class="stat-v" id="c-fix" style="color:var(--wrn)">-</div>
+      <div class="stat-sub" id="c-fix-s">- resolved</div>
+    </div>
+  </div>
+
+  <div class="grid-23">
+    <div class="layout-main">
+      <div class="card">
+        <div class="ch">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--txt-m)" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Interface Status
+        </div>
+        <div style="overflow-x:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Device</th>
+                <th>Interface</th>
+                <th>IP</th>
+                <th>Status</th>
+                <th>TX Load</th>
+                <th>RX Load</th>
+                <th>Label</th>
+              </tr>
+            </thead>
+            <tbody id="interface-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ch">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--txt-m)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Network Traffic Trend (Last Hour)
+        </div>
+        <div class="chart-container">
+          <canvas id="trafficChart"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <div class="card card-anomaly">
+      <div class="ch">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--err)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Anomaly Feed
+      </div>
+      <div class="feed" id="anomaly-feed"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Static colors for Chart.js
+const C = {
+  ac: '#6366f1',
+  ok: '#10b981',
+  err: '#ef4444',
+  txtM: '#94a3b8',
+  brd: '#2a2e3f'
+};
+
+const svg = (path,w,h) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+
+// Prevent XSS
+function escapeHtml(unsafe) {
+    if(!unsafe) return '';
+    return unsafe
+         .toString()
+         .replace(/&/g, "&amp;")
+         .replace(/</g, "&lt;")
+         .replace(/>/g, "&gt;")
+         .replace(/"/g, "&quot;")
+         .replace(/'/g, "&#039;");
+}
+
+function showToast(msg, type, autoHide=true) {
+  const t = document.createElement('div');
+  t.className = 'toast show';
+  let icon = '';
+  if(type==='s') icon = `<div class="t-i s">${svg('<polyline points="20 6 9 17 4 12"/>',14,14)}</div>`;
+  else if(type==='e') icon = `<div class="t-i e">${svg('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',14,14)}</div>`;
+  else icon = `<div class="t-i a">${svg('<line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',14,14)}</div>`;
+  
+  t.innerHTML = icon + '<div style="font-size:0.85rem;font-weight:500">' + escapeHtml(msg) + '</div>';
+  document.body.appendChild(t);
+  
+  if (autoHide) {
+      setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 4000);
+  } else {
+      // Add close button for manual dismissal
+      const closeBtn = document.createElement('button');
+      closeBtn.innerHTML = '&times;';
+      closeBtn.style.cssText = 'background:transparent;border:none;color:inherit;font-size:1.2rem;cursor:pointer;margin-left:auto';
+      closeBtn.onclick = () => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); };
+      t.appendChild(closeBtn);
+  }
+}
+
+function loadColor(pct) {
+  if(pct>50) return 'bg-err';
+  if(pct>20) return 'bg-wrn';
+  return 'bg-ok';
+}
+
+async function fixNow(device, intf) {
+  showToast('Fixing ' + device + ' \u2013 ' + intf + '...', 'a');
+  try {
+      const res = await fetch(`/api/fix/${encodeURIComponent(device)}/${encodeURIComponent(intf)}`, { method: 'POST' });
+      const data = await res.json();
+      if(data.success) showToast('Fixed: ' + device + ' \u2013 ' + intf, 's');
+      else showToast('Fix failed: ' + data.message, 'e');
+  } catch(e) {
+      showToast('Connection error: ' + e, 'e');
+  }
+}
+
+async function rateLimit(device, intf) {
+  showToast('Applying rate limit to ' + device + ' \u2013 ' + intf + '...', 'a');
+  try {
+      const res = await fetch(`/api/ratelimit/${encodeURIComponent(device)}/${encodeURIComponent(intf)}`, { method: 'POST' });
+      const data = await res.json();
+      if(data.success) showToast('Rate limit applied: ' + device + ' \u2013 ' + intf, 's');
+      else showToast('Rate limit failed: ' + data.message, 'e');
+  } catch(e) {
+      showToast('Connection error: ' + e, 'e');
+  }
+}
+
+async function removeLimit(device, intf) {
+  showToast('Removing rate limit from ' + device + ' \u2013 ' + intf + '...', 'a');
+  try {
+      const res = await fetch(`/api/removelimit/${encodeURIComponent(device)}/${encodeURIComponent(intf)}`, { method: 'POST' });
+      const data = await res.json();
+      if(data.success) showToast('Rate limit removed: ' + device + ' \u2013 ' + intf, 's');
+      else showToast('Remove failed: ' + data.message, 'e');
+  } catch(e) {
+      showToast('Connection error: ' + e, 'e');
+  }
+}
+
+async function loadStatus() {
+  try {
+      const res = await fetch('/api/status');
+      if (!res.ok) throw new Error('API Error');
+      const data = await res.json();
+      const tbody = document.getElementById('interface-tbody');
+      tbody.innerHTML = '';
+      
+      data.forEach(row => {
+        // ซ่อน record ALL เมื่อ device กลับมาปกติแล้ว
+        if(row.interface === 'ALL' && row.label === 'normal') return;
+        
+        const txPct = Math.round(row.network_load/255*100);
+        const rxPct = Math.round(row.rxload/255*100);
+        const txCol = loadColor(txPct);
+        const rxCol = loadColor(rxPct);
+        const isAnomaly = (row.label === 'anomaly');
+        const showLimit = (isAnomaly && txPct > 20);
+        const statusBadge = (row.status === 'up') ? 'b-u' : 'b-d';
+        const protoBadge = (row.protocol === 'up') ? 'b-u' : 'b-d';
+        const labelBadge = (row.label === 'normal') ? 'b-n' : 'b-a';
+        
+        const d_esc = escapeHtml(row.device);
+        const i_esc = escapeHtml(row.interface);
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td style="font-weight:600;color:var(--txt)">'+d_esc+'</td>'+
+          '<td>'+i_esc+'</td>'+
+          '<td style="color:var(--txt-m)">'+escapeHtml(row.ip)+'</td>'+
+          '<td><span class="badge '+statusBadge+'">'+escapeHtml(row.status)+'</span>'+
+            ' <span style="color:var(--txt-m);font-size:0.75rem">/</span> '+
+            '<span class="badge '+protoBadge+'">'+escapeHtml(row.protocol)+'</span></td>'+
+          '<td><div class="lbw"><div class="lb"><div class="lbf '+txCol+'" style="width:'+txPct+'%"></div></div>'+
+            '<span style="font-size:0.75rem;color:var(--txt-m);font-variant-numeric:tabular-nums">'+txPct+'%</span></div></td>'+
+          '<td><div class="lbw"><div class="lb"><div class="lbf '+rxCol+'" style="width:'+rxPct+'%"></div></div>'+
+            '<span style="font-size:0.75rem;color:var(--txt-m);font-variant-numeric:tabular-nums">'+rxPct+'%</span></div></td>'+
+          '<td><span class="badge '+labelBadge+'">'+escapeHtml(row.label)+'</span></td>';
+        tbody.appendChild(tr);
+      });
+      document.getElementById('last-update').innerHTML = 'Last updated: '+new Date().toLocaleTimeString('th-TH');
+  } catch(e) {
+      document.getElementById('last-update').innerHTML = '<span style="color:var(--err)">Disconnected</span>';
+  }
+}
+
+async function loadFeed() {
+  try {
+      const res = await fetch('/api/anomalies');
+      if(!res.ok) throw new Error('API Error');
+      const data = await res.json();
+      const feed = document.getElementById('anomaly-feed');
+      feed.innerHTML = '';
+      let lastDateStr = '';
+      data.forEach(row => {
+        const d = new Date(row.predicted_at.replace(' ', 'T'));
+        const dateStr = d.toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'});
+        const time = d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'});
+        
+        if (dateStr !== lastDateStr) {
+            const separator = document.createElement('div');
+            separator.style.cssText = 'padding: 0.5rem 0; font-size: 0.75rem; color: var(--txt-m); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid rgba(255,255,255,0.05); margin: 0.5rem 0;';
+            separator.textContent = dateStr;
+            feed.appendChild(separator);
+            lastDateStr = dateStr;
+        }
+
+        const fixed = row.is_fixed;
+        const fsCls = fixed ? 'o' : 'a';
+        const fsIcon = fixed
+          ? svg('<polyline points="20 6 9 17 4 12"/>',16,16)
+          : svg('<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',16,16);
+        const txPctFeed = Math.round(row.network_load/255*100);
+        const rxPctFeed = Math.round(row.rxload/255*100);
+        const fixedLabel = fixed
+          ? '<span style="color:var(--ok)">Fixed</span>'
+          : '<span style="color:var(--err)">Pending</span>';
+        const src = row.detection_source ? ' | <span style="color:var(--txt-m)">' + escapeHtml(row.detection_source) + '</span>' : '';
+
+        const el = document.createElement('div');
+        el.className = 'fi';
+        el.innerHTML =
+          '<div class="fs '+fsCls+'">'+fsIcon+'</div>'+
+          '<div class="fc">'+
+            '<div class="ft">'+escapeHtml(row.device)+' &mdash; '+escapeHtml(row.interface)+'</div>'+
+            '<div class="fsu">'+escapeHtml(row.status)+'/'+escapeHtml(row.protocol)+' | TX '+txPctFeed+'% | RX '+rxPctFeed+'% | '+fixedLabel+src+'</div>'+
+          '</div>'+
+          '<div class="ftime">'+time+'</div>';
+        feed.appendChild(el);
+      });
+  } catch(e) {}
+}
+
+async function loadAnalytics() {
+  try {
+      const res = await fetch('/api/analytics');
+      if(!res.ok) throw new Error('API Error');
+      const data = await res.json();
+      document.getElementById('c-tot').textContent = data.summary[0].toLocaleString();
+      document.getElementById('c-ano').textContent = data.today[0].toLocaleString();
+      document.getElementById('c-nor').textContent = data.summary[2].toLocaleString();
+      if(data.fix_rate && data.fix_rate[0]>0) {
+        document.getElementById('c-fix').textContent = data.fix_rate[2] + '%';
+        document.getElementById('c-fix-s').textContent = data.fix_rate[1] + '/' + data.fix_rate[0] + ' resolved';
+      } else {
+        document.getElementById('c-fix').textContent = '-';
+        document.getElementById('c-fix-s').textContent = 'No data';
+      }
+  } catch(e) {}
+}
+
+let chart;
+async function loadTraffic() {
+  try {
+      const res = await fetch('/api/traffic');
+      if(!res.ok) throw new Error('API Error');
+      const data = await res.json();
+      
+      const timeLabels = [...new Set(data.map(d => d.time))].reverse();
+      const interfaces = [...new Set(data.map(d => d.device + ' ' + d.interface))].slice(0,5);
+      
+      const ctx = document.getElementById('trafficChart').getContext('2d');
+      
+      const datasets = interfaces.map((intf, i) => {
+        const intfData = data.filter(d => (d.device + ' ' + d.interface) === intf).reverse();
+        const pts = timeLabels.map(t => {
+          const m = intfData.find(d => d.time === t);
+          return m ? Math.max(Math.round(m.tx/255*100), Math.round(m.rx/255*100)) : null; // Use max of tx/rx for device aggregate
+        });
+        const hue = i * 70 + 200; // Start at nice blue/purple hues
+        
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, `hsla(${hue}, 80%, 60%, 0.4)`);
+        gradient.addColorStop(1, `hsla(${hue}, 80%, 60%, 0.0)`);
+
+        return {
+          label: escapeHtml(intf.replace(' ALL', '')), // Hide 'ALL' for cleaner label
+          data: pts,
+          borderColor: `hsl(${hue}, 80%, 60%)`,
+          backgroundColor: gradient,
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true,
+          pointRadius: 0,
+          pointHoverRadius: 6,
+          pointHitRadius: 10
+        };
+      });
+
+      if(chart) chart.destroy();
+      
+      Chart.defaults.color = C.txtM;
+      Chart.defaults.font.family = "'Inter', sans-serif";
+      
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: timeLabels, datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', align: 'end', labels: { boxWidth: 10, usePointStyle: true } }
+          },
+          scales: {
+            y: {
+              beginAtZero: true, max: 100,
+              grid: { color: C.brd },
+              border: { dash: [4, 4] },
+              ticks: { callback: v => v + '%' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { maxTicksLimit: 6 }
+            }
+          },
+          interaction: { mode: 'index', intersect: false }
+        }
+      });
+  } catch(e) {}
+}
+
+const socket = io();
+socket.on('anomaly', (data) => {
+  if(data.is_device_down){
+    showToast('DEVICE DOWN: ' + data.device + ' \u2014 Unreachable!', 'e', false); // No auto hide
+  } else {
+    showToast('ANOMALY: ' + data.device + ' \u2013 ' + data.intf, 'e');
+  }
+  loadFeed(); loadStatus();
+});
+socket.on('device_down', (data) => {
+  showToast('🔴 DEVICE DOWN: ' + data.device + ' (' + data.host + ') \u2014 ' + data.error.substring(0,80), 'e', false); // No auto hide
+  loadFeed(); loadStatus(); loadAnalytics();
+});
+
+async function refresh() {
+  await Promise.all([loadStatus(), loadFeed(), loadAnalytics(), loadTraffic()]);
+}
+
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

@@ -1,5 +1,19 @@
+# Secrets — ห้ามขึ้น git เด็ดขาด
+.env
 config.yaml
-*.pkl
 devices.yaml
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+
+# AI Model
+*.pkl
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/

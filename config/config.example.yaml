@@ -1,0 +1,47 @@
+# ── NetSentinel AI — Configuration ──────────────────────────
+# คัดลอกไฟล์นี้เป็น config.yaml แล้วแก้ค่าตามต้องการ
+# cp config/config.example.yaml config/config.yaml
+
+# AI Model
+model:
+  path: "models/anomaly_model_v2.pkl"
+  threshold_load: 20          # txload/rxload > ค่านี้ = anomaly (0-255)
+  threshold_reliability: 200  # reliability < ค่านี้ = anomaly (0-255)
+  threshold_errors: 10        # input_errors > ค่านี้ = anomaly
+  contamination: 0.05
+  train_validation_fraction: 0.2
+  random_state: 42
+  retrain_interval_hours: 24
+
+# Collector
+collector:
+  interval: 60    # เก็บข้อมูลทุกกี่วินาที (ลดภาระ Router)
+
+# Data Retention
+data_retention:
+  enabled: true
+  days: 30        # ลบข้อมูลเก่ากว่ากี่วัน
+
+# Link Type Mapping — กำหนดประเภท link จาก IP prefix
+# เปลี่ยนตรงนี้ให้ตรงกับ topology ของคุณ ไม่ต้องแก้โค้ด
+link_types:
+  rules:
+    - prefix: "192.168.189"
+      type: Management
+    - prefix: "10.10."
+      type: Core
+    - prefix: "192.168.1."
+      type: LAN
+    - prefix: "192.168.2."
+      type: LAN
+  default: Other
+
+# Anomaly rules — ประเภท interface ที่จะข้ามไม่ตรวจ
+anomaly:
+  skip_types:
+    - Serial
+    - Vlan
+    - NVI
+    - Loopback
+    - Tunnel
+    - Null

@@ -42,6 +42,9 @@ pyserial==3.5
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 PyYAML==6.0.3
+Flask==3.0.3
+flask-socketio==5.4.1
+pytest==9.0.2
 requests==2.33.1
 rich==15.0.0
 ruamel.yaml==0.19.1
