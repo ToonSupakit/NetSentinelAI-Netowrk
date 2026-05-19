@@ -23,6 +23,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-dev.txt
 
+      - name: Set up config files for testing
+        run: |
+          cp config/config.example.yaml config/config.yaml
+          cp config/devices.example.yaml config/devices.yaml
+          cp .env.example .env
+
       - name: Run tests
         run: python -m pytest
 
