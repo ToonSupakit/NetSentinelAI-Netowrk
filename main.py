@@ -12,7 +12,7 @@ from app.db import init_db, cleanup_old_data
 from app.collector import collect_all
 from app.predictor import predict_all, reload_model
 from app.bot import run_bot, anomaly_queue, client, send_timeout_alert
-from app.runtime import shutdown_event, request_shutdown
+from app.runtime import shutdown_event, request_shutdown, collect_now_event
 from web.dashboard import run_dashboard, push_anomaly, push_device_down
 
 load_dotenv()
@@ -133,7 +133,19 @@ def collect_and_predict():
         except Exception as e:
             log.error("Collect/Predict error: %s", e)
 
-        if shutdown_event.wait(timeout=INTERVAL):
+        # Wait for interval OR early wakeup from remediation
+        collect_now_event.clear()
+        # Use short sleep steps so collect_now_event can wake us early
+        waited = 0
+        while waited < INTERVAL:
+            if shutdown_event.is_set():
+                break
+            if collect_now_event.wait(timeout=min(2, INTERVAL - waited)):
+                collect_now_event.clear()
+                log.info("Early collect triggered (post-remediation)")
+                break
+            waited += 2
+        if shutdown_event.is_set():
             break
 
     log.info("Collector + predictor loop stopped")

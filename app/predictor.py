@@ -1,41 +1,41 @@
-﻿# à¸™à¸³à¹€à¸‚à¹‰à¸²à¹„à¸¥à¸šà¸£à¸²à¸£à¸µà¸—à¸µà¹ˆà¸ˆà¸³à¹€à¸›à¹‡à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£à¸—à¸³à¸™à¸²à¸¢à¸”à¹‰à¸§à¸¢ AI
-import joblib  # à¸ªà¸³à¸«à¸£à¸±à¸šà¹‚à¸«à¸¥à¸”à¹à¸¥à¸°à¸šà¸±à¸™à¸—à¸¶à¸ AI model
-import yaml  # à¸ªà¸³à¸«à¸£à¸±à¸šà¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¸à¸²à¸£à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²
+# Import required libraries for AI prediction
+import joblib  # For loading and saving AI models
+import yaml  # For reading configuration files
 import logging
 from app import prediction_intel
 from app.ai_features import frame_for_prediction
 from app.db import (
     get_interface_runtime_features,
     save_prediction,
-)  # à¸Ÿà¸±à¸‡à¸à¹Œà¸Šà¸±à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸šà¸±à¸™à¸—à¸¶à¸à¸œà¸¥à¸à¸²à¸£à¸—à¸³à¸™à¸²à¸¢
+)  # Function for saving prediction results
 
 log = logging.getLogger(__name__)
 
-# à¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¸à¸²à¸£à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¸ˆà¸²à¸ config.yaml
+# Read configuration settings from config.yaml
 with open("config/config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
-# à¸•à¸±à¸§à¹à¸›à¸£à¹‚à¸à¸¥à¸šà¸­à¸¥à¸ªà¸³à¸«à¸£à¸±à¸šà¹€à¸à¹‡à¸šà¹‚à¸¡à¹€à¸”à¸¥
+# Global variable for holding the loaded model
 model = None
 
 
 def reload_model():
-    """à¹‚à¸«à¸¥à¸” à¸«à¸£à¸·à¸­ à¹‚à¸«à¸¥à¸” AI model à¹ƒà¸«à¸¡à¹ˆà¸ˆà¸²à¸à¹„à¸Ÿà¸¥à¹Œ"""
+    """Load or reload the AI model from the configured path."""
     global model
     try:
         model = joblib.load(config["model"]["path"])
-        log.info(f"ðŸ”„ à¹‚à¸«à¸¥à¸” AI model à¸ªà¸³à¹€à¸£à¹‡à¸ˆà¸ˆà¸²à¸ {config['model']['path']}")
+        log.info(f"🔄 Loaded AI model successfully from {config['model']['path']}")
     except FileNotFoundError:
         model = None
         log.warning(
-            f"âš ï¸ à¹„à¸¡à¹ˆà¸žà¸š model file: {config['model']['path']} â€” à¹ƒà¸«à¹‰à¸£à¸±à¸™ train_model.py à¸à¹ˆà¸­à¸™"
+            f"⚠️ Model file not found: {config['model']['path']} — run train_model.py first"
         )
     except Exception as e:
         model = None
-        log.error(f"âŒ à¹‚à¸«à¸¥à¸” model à¸¥à¹‰à¸¡à¹€à¸«à¸¥à¸§: {e}")
+        log.error(f"❌ Failed to load model: {e}")
 
 
-# à¹‚à¸«à¸¥à¸”à¸„à¸£à¸±à¹‰à¸‡à¹à¸£à¸à¸•à¸­à¸™à¹€à¸£à¸´à¹ˆà¸¡à¹‚à¸›à¸£à¹à¸à¸£à¸¡
+# Load the model upon program initialization
 reload_model()
 
 
@@ -44,21 +44,21 @@ def analyze_cause(data):
 
 
 def predict_one(data):
-    """à¸—à¸³à¸™à¸²à¸¢à¸„à¸§à¸²à¸¡à¸œà¸´à¸”à¸›à¸à¸•à¸´à¸ªà¸³à¸«à¸£à¸±à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥ interface à¸Šà¸¸à¸”à¹€à¸”à¸µà¸¢à¸§
+    """Predict anomalies for a single interface dataset.
 
-    AI à¸—à¸³à¸‡à¸²à¸™à¸„à¸¹à¹ˆà¸‚à¸™à¸²à¸™à¸à¸±à¸š Rules à¹€à¸ªà¸¡à¸­ (à¹„à¸¡à¹ˆà¹ƒà¸Šà¹ˆà¹à¸„à¹ˆà¸”à¹ˆà¸²à¸™à¸ªà¸­à¸‡):
-    1) device_unreachable â€” à¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹„à¸¡à¹ˆà¹„à¸”à¹‰
-    2) rules+ai â€” à¸—à¸±à¹‰à¸‡ Rules à¹à¸¥à¸° AI à¹€à¸«à¹‡à¸™à¸•à¸£à¸‡à¸à¸±à¸™à¸§à¹ˆà¸²à¸œà¸´à¸”à¸›à¸à¸•à¸´
-    3) rules â€” à¹€à¸‰à¸žà¸²à¸° Rules à¸šà¸­à¸à¸§à¹ˆà¸²à¸œà¸´à¸”à¸›à¸à¸•à¸´ (AI à¹„à¸¡à¹ˆà¸žà¸š à¸«à¸£à¸·à¸­à¹„à¸¡à¹ˆà¸¡à¸µ model)
-    4) ai â€” à¹€à¸‰à¸žà¸²à¸° AI à¸•à¸£à¸§à¸ˆà¸žà¸š pattern à¸œà¸´à¸”à¸›à¸à¸•à¸´ (Rules à¸¡à¸­à¸‡à¸§à¹ˆà¸²à¸›à¸à¸•à¸´)
-    5) healthy â€” à¸œà¹ˆà¸²à¸™à¸—à¸±à¹‰à¸‡ Rules à¹à¸¥à¸° AI
+    AI runs in parallel with heuristic Rules:
+    1) device_unreachable - Device cannot be collected
+    2) rules+ai - Both rules and AI classify as anomaly
+    3) rules - Classified as anomaly by rules only (AI says normal, or model missing)
+    4) ai - Classified as anomaly by AI only (rules say healthy)
+    5) healthy - Classified as healthy by both rules and AI
     """
     if data.get("is_device_down"):
         return "anomaly", 1.0, "device_unreachable"
 
     rules_says_anomaly = data["label"] == "anomaly"
 
-    # â”€â”€ AI Analysis (à¸—à¸³à¸‡à¸²à¸™à¹€à¸ªà¸¡à¸­à¸–à¹‰à¸²à¸¡à¸µ model) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # -- AI Analysis (runs if the model is loaded) ----------------------------
     ai_says_anomaly = False
     ai_confidence = 0.0
 
@@ -66,27 +66,27 @@ def predict_one(data):
         features = frame_for_prediction(data, model)
 
         pred_int = model.predict(features)[0]
-        # decision_function: à¸„à¹ˆà¸²à¸¢à¸´à¹ˆà¸‡à¸•à¸´à¸”à¸¥à¸š = à¸¢à¸´à¹ˆà¸‡ outlier
+        # decision_function: more negative value = more outlier
         score = model.decision_function(features)[0]
-        ai_confidence = min(1.0, max(0.0, 0.5 - score))  # à¹à¸›à¸¥à¸‡à¹€à¸›à¹‡à¸™ 0-1
+        ai_confidence = min(1.0, max(0.0, 0.5 - score))  # map score to 0-1 confidence
 
         if pred_int == -1:
             ai_says_anomaly = True
 
-    # â”€â”€ à¸•à¸±à¸”à¸ªà¸´à¸™à¸œà¸¥à¸£à¸§à¸¡ â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # -- Combined Decision ----------------------------------------------------
     if rules_says_anomaly and ai_says_anomaly:
-        # à¸—à¸±à¹‰à¸‡à¸ªà¸­à¸‡à¹€à¸«à¹‡à¸™à¸•à¸£à¸‡à¸à¸±à¸™ â†’ à¸„à¸§à¸²à¸¡à¸¡à¸±à¹ˆà¸™à¹ƒà¸ˆà¸ªà¸¹à¸‡à¸ªà¸¸à¸”
+        # Both methods agree -> highest confidence
         return "anomaly", max(0.95, ai_confidence), "rules+ai"
 
     if rules_says_anomaly:
-        # à¹€à¸‰à¸žà¸²à¸° Rules à¹€à¸«à¹‡à¸™ (AI à¸­à¸²à¸ˆà¹„à¸¡à¹ˆà¸¡à¸µ model à¸«à¸£à¸·à¸­ AI à¹„à¸¡à¹ˆà¹€à¸«à¹‡à¸™à¸”à¹‰à¸§à¸¢)
+        # Rules only (AI says normal or model missing)
         return "anomaly", 1.0, "rules"
 
     if ai_says_anomaly:
-        # à¹€à¸‰à¸žà¸²à¸° AI à¹€à¸«à¹‡à¸™ â€” pattern à¸œà¸´à¸”à¸›à¸à¸•à¸´à¸—à¸µà¹ˆ Rules à¹„à¸¡à¹ˆà¸„à¸£à¸­à¸šà¸„à¸¥à¸¸à¸¡
+        # AI only -> unusual pattern that rules did not cover
         return "anomaly", round(ai_confidence, 4), "ai"
 
-    # à¸œà¹ˆà¸²à¸™à¸—à¸±à¹‰à¸‡à¸„à¸¹à¹ˆ
+    # Both agree it is normal
     return "normal", 1.0, "healthy"
 
 
@@ -128,7 +128,7 @@ def apply_correlation(anomalies):
 
 
 def predict_all(collected_data):
-    """à¸—à¸³à¸™à¸²à¸¢à¸„à¸§à¸²à¸¡à¸œà¸´à¸”à¸›à¸à¸•à¸´à¸ªà¸³à¸«à¸£à¸±à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥ interface à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”"""
+    """Predict anomalies for all collected interface data."""
     records = []
     anomalies = []
 

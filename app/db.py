@@ -1,10 +1,10 @@
-﻿# à¸™à¸³à¹€à¸‚à¹‰à¸²à¹„à¸¥à¸šà¸£à¸²à¸£à¸µà¸—à¸µà¹ˆà¸ˆà¸³à¹€à¸›à¹‡à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸ˆà¸±à¸”à¸à¸²à¸£à¸à¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥
+# Database management module for network AI operations
 from sqlalchemy import (
     create_engine,
     text,
-)  # à¹„à¸¥à¸šà¸£à¸²à¸£à¸µà¸ªà¸³à¸«à¸£à¸±à¸šà¸ˆà¸±à¸”à¸à¸²à¸£à¸à¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ SQL
-from datetime import datetime  # à¸ªà¸³à¸«à¸£à¸±à¸šà¸ˆà¸±à¸”à¸à¸²à¸£à¸§à¸±à¸™à¸—à¸µà¹ˆà¹à¸¥à¸°à¹€à¸§à¸¥à¸²
-import yaml  # à¸ªà¸³à¸«à¸£à¸±à¸šà¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¸à¸²à¸£à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²
+)  # SQL database management library
+from datetime import datetime  # Date and time utilities
+import yaml  # YAML file configuration loader
 import logging
 import os
 from dotenv import load_dotenv
@@ -14,19 +14,19 @@ from app import user_repository
 load_dotenv()
 log = logging.getLogger(__name__)
 
-# à¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¸à¸²à¸£à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¸ˆà¸²à¸ config.yaml
+# Read configuration settings from config.yaml
 with open("config/config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
-# à¸ªà¸£à¹‰à¸²à¸‡à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¸à¸±à¸šà¸à¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ MySQL â€” à¸­à¹ˆà¸²à¸™ URL à¸ˆà¸²à¸ .env
+# Establish database engine connection using parameters from env or config
 DB_URL = os.getenv("DB_URL", config.get("database", {}).get("url", ""))
 engine = create_engine(DB_URL, pool_size=5, max_overflow=10, pool_recycle=3600, pool_pre_ping=True)
 
 
 def init_db():
-    """à¸Ÿà¸±à¸‡à¸à¹Œà¸Šà¸±à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¹€à¸£à¸´à¹ˆà¸¡à¸•à¹‰à¸™à¸à¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ à¸ªà¸£à¹‰à¸²à¸‡à¸•à¸²à¸£à¸²à¸‡à¸—à¸µà¹ˆà¸ˆà¸³à¹€à¸›à¹‡à¸™"""
+    """Initialize the database and create all necessary tables and indexes if they do not exist."""
     with engine.connect() as conn:
-        # à¸ªà¸£à¹‰à¸²à¸‡à¸•à¸²à¸£à¸²à¸‡ interface_logs à¸ªà¸³à¸«à¸£à¸±à¸šà¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥ interface
+        # Create interface_logs table for storing collected interface status and metrics
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS interface_logs (
                 id             INT AUTO_INCREMENT PRIMARY KEY,
@@ -47,7 +47,7 @@ def init_db():
                 label          VARCHAR(10)
             )
         """))
-        # à¸ªà¸£à¹‰à¸²à¸‡à¸•à¸²à¸£à¸²à¸‡ ai_predictions à¸ªà¸³à¸«à¸£à¸±à¸šà¹€à¸à¹‡à¸šà¸œà¸¥à¸à¸²à¸£à¸—à¸³à¸™à¸²à¸¢à¸‚à¸­à¸‡ AI
+        # Create ai_predictions table for storing predictive results from the AI models
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS ai_predictions (
                 id               INT AUTO_INCREMENT PRIMARY KEY,
@@ -66,7 +66,7 @@ def init_db():
                 FOREIGN KEY (log_id) REFERENCES interface_logs(id)
             )
         """))
-        # à¸ªà¸£à¹‰à¸²à¸‡à¸•à¸²à¸£à¸²à¸‡ devices à¸ªà¸³à¸«à¸£à¸±à¸šà¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸­à¸¸à¸›à¸à¸£à¸“à¹Œ
+        # Create devices table for network device asset tracking
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS devices (
                 id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -82,7 +82,7 @@ def init_db():
                 created_at  TIMESTAMP DEFAULT current_timestamp()
             )
         """))
-        # à¸ªà¸£à¹‰à¸²à¸‡à¸•à¸²à¸£à¸²à¸‡ users à¸ªà¸³à¸«à¸£à¸±à¸šà¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸œà¸¹à¹‰à¹ƒà¸Šà¹‰ Dashboard
+        # Create users table for dashboard user authentication and role management
         conn.execute(text("""
             CREATE TABLE IF NOT EXISTS users (
                 id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -93,7 +93,7 @@ def init_db():
             )
         """))
 
-        # â”€â”€ à¸ªà¸£à¹‰à¸²à¸‡ Indexes à¹€à¸žà¸·à¹ˆà¸­à¹€à¸žà¸´à¹ˆà¸¡à¸„à¸§à¸²à¸¡à¹€à¸£à¹‡à¸§ query â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        # -- Create Indexes for Query Performance Optimization ----------------------
         index_statements = [
             "CREATE INDEX idx_logs_device_intf_time ON interface_logs(device_name, interface_name, collected_at)",
             "CREATE INDEX idx_logs_label ON interface_logs(label)",
@@ -105,7 +105,7 @@ def init_db():
             try:
                 conn.execute(text(stmt))
             except Exception:
-                pass  # index à¸­à¸²à¸ˆà¸¡à¸µà¸­à¸¢à¸¹à¹ˆà¹à¸¥à¹‰à¸§
+                pass  # Index might already exist
 
         conn.commit()
     _migrate_ai_predictions_detection_source()
@@ -115,7 +115,7 @@ def init_db():
 
 
 def _migrate_ai_predictions_detection_source():
-    """à¹€à¸žà¸´à¹ˆà¸¡à¸„à¸­à¸¥à¸±à¸¡à¸™à¹Œ detection_source à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸µà¹ˆà¸ªà¸£à¹‰à¸²à¸‡à¸ˆà¸²à¸à¸ªà¸„à¸µà¸¡à¸²à¹€à¸à¹ˆà¸²"""
+    """Migrate database to add detection_source column to existing schemas."""
     try:
         with engine.connect() as conn:
             conn.execute(text("ALTER TABLE ai_predictions ADD COLUMN detection_source VARCHAR(32) NULL"))
@@ -125,6 +125,7 @@ def _migrate_ai_predictions_detection_source():
 
 
 def _migrate_ai_predictions_intel_columns():
+    """Migrate database to add severity, correlation, and suppression columns."""
     statements = [
         "ALTER TABLE ai_predictions ADD COLUMN severity VARCHAR(16) NULL",
         "ALTER TABLE ai_predictions ADD COLUMN correlated_with VARCHAR(128) NULL",
@@ -140,10 +141,10 @@ def _migrate_ai_predictions_intel_columns():
 
 
 def cleanup_old_data(days=30):
-    """à¸¥à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹€à¸à¹ˆà¸²à¸à¸§à¹ˆà¸² N à¸§à¸±à¸™ à¹€à¸žà¸·à¹ˆà¸­à¹„à¸¡à¹ˆà¹ƒà¸«à¹‰ DB à¸šà¸§à¸¡"""
+    """Clean up database logs and predictions older than N days to prevent ballooning size."""
     try:
         with engine.connect() as conn:
-            # à¸¥à¸š predictions à¹€à¸à¹ˆà¸²
+            # Delete old prediction logs
             result1 = conn.execute(
                 text("""
                 DELETE FROM ai_predictions
@@ -152,7 +153,7 @@ def cleanup_old_data(days=30):
                 {"days": days},
             )
 
-            # à¸¥à¸š logs à¹€à¸à¹ˆà¸²à¸—à¸µà¹ˆà¹„à¸¡à¹ˆà¸¡à¸µ prediction à¸­à¹‰à¸²à¸‡à¸­à¸´à¸‡
+            # Delete old interface logs that are no longer referenced by predictions
             result2 = conn.execute(
                 text("""
                 DELETE FROM interface_logs
@@ -165,15 +166,16 @@ def cleanup_old_data(days=30):
             conn.commit()
             total = result1.rowcount + result2.rowcount
             if total > 0:
-                log.info(f"Cleanup: à¸¥à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¹€à¸à¹ˆà¸² {total} records (>{days} à¸§à¸±à¸™)")
+                log.info(f"Cleanup: Deleted {total} old records (> {days} days)")
     except Exception as e:
         log.error(f"Cleanup error: {e}")
 
 
 def get_analytics():
+    """Retrieve statistical analytics for reporting metrics in the dashboard."""
     with engine.connect() as conn:
 
-        # 1. à¸ªà¸£à¸¸à¸› anomaly à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”
+        # 1. Overall anomaly summary
         anomaly_summary = conn.execute(text("""
             SELECT 
                 COUNT(*) as total_logs,
@@ -183,7 +185,7 @@ def get_analytics():
             FROM interface_logs
         """)).fetchone()
 
-        # 2. anomaly à¸§à¸±à¸™à¸™à¸µà¹‰
+        # 2. Today's anomalies
         anomaly_today = conn.execute(text("""
             SELECT COUNT(*) as today_anomaly
             FROM ai_predictions
@@ -191,7 +193,7 @@ def get_analytics():
               AND DATE(predicted_at) = CURDATE()
         """)).fetchone()
 
-        # 3. fix rate
+        # 3. Remediation fix rate
         fix_rate = conn.execute(text("""
             SELECT 
                 COUNT(*)                                    as total_anomaly,
@@ -201,7 +203,7 @@ def get_analytics():
             WHERE prediction_label = 'anomaly'
         """)).fetchone()
 
-        # 4. top 5 device à¸—à¸µà¹ˆà¸¡à¸µà¸›à¸±à¸à¸«à¸²à¹€à¸¢à¸­à¸°à¸ªà¸¸à¸”
+        # 4. Top 5 devices with most anomalies
         top_devices = conn.execute(text("""
             SELECT device_name, COUNT(*) as anomaly_count
             FROM ai_predictions
@@ -211,7 +213,7 @@ def get_analytics():
             LIMIT 5
         """)).fetchall()
 
-        # 5. top 5 interface à¸—à¸µà¹ˆà¸¡à¸µà¸›à¸±à¸à¸«à¸²à¹€à¸¢à¸­à¸°à¸ªà¸¸à¸”
+        # 5. Top 5 interfaces with most anomalies
         top_interfaces = conn.execute(text("""
             SELECT device_name, interface_name, COUNT(*) as anomaly_count
             FROM ai_predictions
@@ -221,7 +223,7 @@ def get_analytics():
             LIMIT 5
         """)).fetchall()
 
-        # 6. uptime à¹à¸•à¹ˆà¸¥à¸° device (% à¸‚à¸­à¸‡à¹€à¸§à¸¥à¸²à¸—à¸µà¹ˆ normal)
+        # 6. Device availability/uptime percentage
         uptime = conn.execute(text("""
             SELECT 
                 device_name,
@@ -232,7 +234,7 @@ def get_analytics():
             ORDER BY device_name
         """)).fetchall()
 
-        # 7. traffic trend à¸£à¸²à¸¢à¸Šà¸±à¹ˆà¸§à¹‚à¸¡à¸‡ (6 à¸Šà¸±à¹ˆà¸§à¹‚à¸¡à¸‡à¸¥à¹ˆà¸²à¸ªà¸¸à¸”)
+        # 7. Outgoing network traffic load trend (last 6 hours)
         traffic_trend = conn.execute(text("""
             SELECT 
                 DATE_FORMAT(collected_at, '%H:00') as hour,
@@ -245,7 +247,7 @@ def get_analytics():
             ORDER BY hour ASC
         """)).fetchall()
 
-        # 8. anomaly by type
+        # 8. Anomalies grouped by interface states
         anomaly_by_type = conn.execute(text("""
             SELECT 
                 status, protocol,
@@ -269,6 +271,7 @@ def get_analytics():
 
 
 def save_log(device, intf, ip, status, proto, rel, tx, rx, err, ltype, zone, location, label):
+    """Save an interface status log record to the database."""
     now = datetime.now()
     with engine.connect() as conn:
         result = conn.execute(
@@ -380,6 +383,7 @@ def save_prediction(
     correlated_with=None,
     notification_suppressed=False,
 ):
+    """Save an AI/Rules anomaly detection prediction result."""
     with engine.connect() as conn:
         conn.execute(
             text("""
@@ -407,6 +411,7 @@ def save_prediction(
 
 
 def get_anomaly_history(limit=10):
+    """Retrieve anomaly prediction history logs."""
     with engine.connect() as conn:
         result = conn.execute(
             text("""
@@ -427,6 +432,7 @@ def get_anomaly_history(limit=10):
 
 
 def mark_as_fixed(log_id):
+    """Mark a prediction log as fixed."""
     with engine.connect() as conn:
         conn.execute(
             text("""
@@ -440,7 +446,7 @@ def mark_as_fixed(log_id):
 
 
 def mark_anomalies_fixed_for_interface(device_name, interface_name):
-    """à¸«à¸¥à¸±à¸‡ remediation à¸ˆà¸²à¸ Dashboard â€” à¸—à¸³à¹€à¸„à¸£à¸·à¹ˆà¸­à¸‡à¸«à¸¡à¸²à¸¢ anomaly à¸—à¸µà¹ˆà¸¢à¸±à¸‡à¹„à¸¡à¹ˆ fixed à¸‚à¸­à¸‡ interface à¸™à¸µà¹‰"""
+    """Mark all active anomalies as fixed for a specific interface after remediation."""
     now = datetime.now()
     with engine.connect() as conn:
         conn.execute(
@@ -457,6 +463,7 @@ def mark_anomalies_fixed_for_interface(device_name, interface_name):
 
 
 def get_device_status():
+    """Retrieve the latest status record for all interfaces across devices."""
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT l.device_name, l.interface_name, l.ip_address,
@@ -475,7 +482,7 @@ def get_device_status():
         return result.fetchall()
 
 
-# â”€â”€ User Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- User Management ----------------------------------------------------------
 def _seed_default_admin():
     user_repository.seed_default_admin(engine)
 

@@ -12,6 +12,7 @@ from app.db import (
     update_user_role,
     mark_anomalies_fixed_for_interface,
 )
+from app.runtime import request_collect_now
 from app.model_registry import load_metadata
 from app.vendor_adapters import remediation_commands, supported_vendors
 from web.api_serializers import (
@@ -559,6 +560,13 @@ def execute_remediation_task(device_name, intf, action, limit_mbps=None):
 
         label = {"fix": "Fix", "limit": f"Limit ({limit_mbps} Mbps)", "removelimit": "Remove Limit"}
         log.info(f"Remediation ({action}): {device_name} — {intf} successful")
+
+        # Trigger immediate re-collection after router stabilizes
+        import time as _time
+        _time.sleep(2)
+        request_collect_now()
+        _time.sleep(1.5)  # Wait briefly for collector thread to run and update DB
+
         socketio.emit(
             "remediation_result",
             {

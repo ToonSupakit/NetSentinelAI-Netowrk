@@ -6,46 +6,46 @@ def analyze_cause(data, config):
     suggestions = []
 
     if data.get("is_device_down"):
-        causes.append("à¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¹„à¸¡à¹ˆà¹„à¸”à¹‰ (Device Unreachable)")
+        causes.append("Device Unreachable")
         suggestions.append(
-            "à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸§à¹ˆà¸²à¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¹€à¸›à¸´à¸”à¸­à¸¢à¸¹à¹ˆà¹à¸¥à¸°à¹€à¸„à¸£à¸·à¸­à¸‚à¹ˆà¸²à¸¢à¸–à¸¶à¸‡à¸à¸±à¸™"
+            "Verify device power status and network connectivity"
         )
         return causes, suggestions
 
     if data["is_admin_down"]:
-        causes.append("Port à¸–à¸¹à¸à¸›à¸´à¸”à¸”à¹‰à¸§à¸¢à¸„à¸³à¸ªà¸±à¹ˆà¸‡ shutdown")
-        suggestions.append(f"no shutdown à¸šà¸™ {data['intf']}")
+        causes.append("Port administratively shutdown")
+        suggestions.append(f"Run 'no shutdown' on {data['intf']}")
     elif data["status_num"] == 1 and data["protocol_num"] == 0:
-        causes.append("Port up à¹à¸•à¹ˆ Protocol down (Link down)")
-        suggestions.append("à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸ªà¸²à¸¢à¹à¸¥à¸°à¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¸›à¸¥à¸²à¸¢à¸—à¸²à¸‡")
+        causes.append("Interface status is Up, but protocol status is Down (Link down)")
+        suggestions.append("Check cable connection and remote device status")
     elif data["status_num"] == 0:
-        causes.append("Port à¹„à¸¡à¹ˆà¸—à¸³à¸‡à¸²à¸™ (Physical down)")
-        suggestions.append("à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸ªà¸²à¸¢à¹à¸¥à¸°à¸à¸²à¸£à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­")
+        causes.append("Interface physical status is Down")
+        suggestions.append("Verify physical cabling and transceiver connectivity")
 
     model_cfg = config["model"]
     if data["network_load"] > model_cfg["threshold_load"]:
         pct = round(data["network_load"] / 255 * 100, 1)
-        causes.append(f"Traffic à¸‚à¸²à¸­à¸­à¸à¸ªà¸¹à¸‡ ({pct}%)")
-        suggestions.append("à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š traffic à¸­à¸²à¸ˆà¸¡à¸µ loop à¸«à¸£à¸·à¸­ flood")
+        causes.append(f"High outgoing traffic ({pct}%)")
+        suggestions.append("Inspect traffic patterns for possible network loops or broadcast storms")
 
     if data["rxload"] > model_cfg["threshold_load"]:
         pct = round(data["rxload"] / 255 * 100, 1)
-        causes.append(f"Traffic à¸‚à¸²à¹€à¸‚à¹‰à¸²à¸ªà¸¹à¸‡ ({pct}%)")
-        suggestions.append("à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š traffic à¸­à¸²à¸ˆà¸–à¸¹à¸ DDoS")
+        causes.append(f"High incoming traffic ({pct}%)")
+        suggestions.append("Check for potential DDoS attacks or excessive downloads")
 
     if data["reliability"] < model_cfg["threshold_reliability"]:
         pct = round(data["reliability"] / 255 * 100, 1)
-        causes.append(f"à¸„à¸§à¸²à¸¡à¹€à¸ªà¸–à¸µà¸¢à¸£à¸•à¹ˆà¸³ ({pct}%)")
-        suggestions.append("à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸„à¸¸à¸“à¸ à¸²à¸žà¸ªà¸²à¸¢")
+        causes.append(f"Low interface reliability ({pct}%)")
+        suggestions.append("Inspect cable quality and check for electromagnetic interference")
 
     if data["input_errors"] > model_cfg["threshold_errors"]:
-        causes.append(f"Input errors {data['input_errors']} à¸„à¸£à¸±à¹‰à¸‡")
-        suggestions.append("à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸š duplex mismatch à¸«à¸£à¸·à¸­à¸ªà¸²à¸¢à¸Šà¸³à¸£à¸¸à¸”")
+        causes.append(f"High input errors count: {data['input_errors']}")
+        suggestions.append("Check for duplex mismatch or damaged cabling")
 
     if not causes:
-        causes.append("AI à¸•à¸£à¸§à¸ˆà¸žà¸šà¸žà¸¤à¸•à¸´à¸à¸£à¸£à¸¡à¸œà¸´à¸”à¸›à¸à¸•à¸´ (Unusual Pattern Detection)")
+        causes.append("AI detected anomalous behavior (Unusual Pattern Detection)")
         suggestions.append(
-            "à¸•à¸£à¸§à¸ˆà¸ªà¸­à¸šà¸à¸£à¸²à¸Ÿ Traffic à¸­à¸²à¸ˆà¸¡à¸µà¹à¸žà¸—à¹€à¸—à¸´à¸£à¹Œà¸™à¸—à¸µà¹ˆà¸•à¹ˆà¸²à¸‡à¹„à¸›à¸ˆà¸²à¸à¹€à¸”à¸´à¸¡"
+            "Review traffic charts for unusual deviation from historic baseline"
         )
 
     return causes, suggestions

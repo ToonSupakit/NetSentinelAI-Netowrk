@@ -1,14 +1,10 @@
-﻿# à¸™à¸³à¹€à¸‚à¹‰à¸²à¹„à¸¥à¸šà¸£à¸²à¸£à¸µà¸—à¸µà¹ˆà¸ˆà¸³à¹€à¸›à¹‡à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£à¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ˆà¸²à¸à¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¹€à¸„à¸£à¸·à¸­à¸‚à¹ˆà¸²à¸¢
-from netmiko import (
-    ConnectHandler,
-)  # à¹„à¸¥à¸šà¸£à¸²à¸£à¸µà¸ªà¸³à¸«à¸£à¸±à¸šà¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¸à¸±à¸šà¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¹€à¸„à¸£à¸·à¸­à¸‚à¹ˆà¸²à¸¢
-from app.db import (
-    save_log,
-)  # à¸Ÿà¸±à¸‡à¸à¹Œà¸Šà¸±à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸šà¸±à¸™à¸—à¸¶à¸à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸¥à¸‡à¸à¸²à¸™à¸‚à¹‰à¸­à¸¡à¸¹à¸¥
+# Import required libraries for network device data collection
+from netmiko import ConnectHandler  # Library for SSH/Telnet connections to network devices
+from app.db import save_log  # Function for saving collected logs to database
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import yaml  # à¸ªà¸³à¸«à¸£à¸±à¸šà¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¸à¸²à¸£à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²
-import re  # à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£à¸›à¸£à¸°à¸¡à¸§à¸¥à¸œà¸¥à¸‚à¹‰à¸­à¸„à¸§à¸²à¸¡à¸”à¹‰à¸§à¸¢ regular expression
-import time  # à¸ªà¸³à¸«à¸£à¸±à¸šà¸ˆà¸±à¸”à¸à¸²à¸£à¹€à¸§à¸¥à¸²
+import yaml  # For reading configuration files
+import re  # For text processing using regular expressions
+import time  # For handling delays
 import os
 import logging
 from dotenv import load_dotenv
@@ -19,25 +15,25 @@ from app.simulator import simulated_interfaces, simulator_enabled
 load_dotenv()
 log = logging.getLogger(__name__)
 
-# à¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¸à¸²à¸£à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¸ˆà¸²à¸ config.yaml
+# Read configuration settings from config.yaml
 with open("config/config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 
-# à¸­à¹ˆà¸²à¸™à¹„à¸Ÿà¸¥à¹Œà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¸ˆà¸²à¸ devices.yaml
+# Read device configurations from devices.yaml
 with open("config/devices.yaml", "r", encoding="utf-8") as f:
     devices_config = yaml.safe_load(f)
 
-# à¸”à¸¶à¸‡à¸„à¹ˆà¸²à¸à¸²à¸£à¸•à¸±à¹‰à¸‡à¸„à¹ˆà¸²à¸ˆà¸²à¸à¹„à¸Ÿà¸¥à¹Œ config
+# Extract configurations from config file
 SKIP_TYPES = [
     s for s in config["anomaly"]["skip_types"] if s is not None
-]  # à¸›à¸£à¸°à¹€à¸ à¸— interface à¸—à¸µà¹ˆà¸ˆà¸°à¸‚à¹‰à¸²à¸¡
-THRESHOLD_LOAD = config["model"]["threshold_load"]  # à¸„à¹ˆà¸² threshold à¸ªà¸³à¸«à¸£à¸±à¸š network load
-THRESHOLD_RELIABILITY = config["model"]["threshold_reliability"]  # à¸„à¹ˆà¸² threshold à¸ªà¸³à¸«à¸£à¸±à¸š reliability
-THRESHOLD_ERRORS = config["model"]["threshold_errors"]  # à¸„à¹ˆà¸² threshold à¸ªà¸³à¸«à¸£à¸±à¸š input errors
-MAX_RETRIES = 3  # à¸ˆà¸³à¸™à¸§à¸™à¸„à¸£à¸±à¹‰à¸‡à¸ªà¸¹à¸‡à¸ªà¸¸à¸”à¹ƒà¸™à¸à¸²à¸£ retry
-RETRY_DELAY = 5  # à¸£à¸°à¸¢à¸°à¹€à¸§à¸¥à¸²à¸«à¸™à¹ˆà¸§à¸‡à¸£à¸°à¸«à¸§à¹ˆà¸²à¸‡ retry (à¸§à¸´à¸™à¸²à¸—à¸µ)
+]  # Types of interfaces to skip
+THRESHOLD_LOAD = config["model"]["threshold_load"]  # Threshold for network load
+THRESHOLD_RELIABILITY = config["model"]["threshold_reliability"]  # Threshold for reliability
+THRESHOLD_ERRORS = config["model"]["threshold_errors"]  # Threshold for input errors
+MAX_RETRIES = 3  # Maximum retry attempts
+RETRY_DELAY = 5  # Timeout delay between retries (seconds)
 
-# â”€â”€ Link Type â€” à¸­à¹ˆà¸²à¸™à¸ˆà¸²à¸ config (à¹„à¸¡à¹ˆ hardcode IP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Link Type rules from config (avoid hardcoding IP) ------------------------
 LINK_TYPE_RULES = config.get("link_types", {}).get("rules", [])
 LINK_TYPE_DEFAULT = config.get("link_types", {}).get("default", "Other")
 
@@ -55,7 +51,7 @@ def upstream_devices(device):
 
 
 def get_device_credentials(device):
-    """à¸”à¸¶à¸‡ credentials à¸ˆà¸²à¸ device config à¸«à¸£à¸·à¸­ .env default (à¸­à¹ˆà¸²à¸™ os.environ à¸—à¸¸à¸à¸„à¸£à¸±à¹‰à¸‡)"""
+    """Retrieve credentials from device config or default .env variables."""
     return {
         "device_type": device["device_type"],
         "host": device["host"],
@@ -74,37 +70,37 @@ def get_link_type(ip):
 
 
 def parse_interfaces(raw):
-    """à¹à¸›à¸¥à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ˆà¸²à¸à¸„à¸³à¸ªà¸±à¹ˆà¸‡ show interfaces à¹€à¸›à¹‡à¸™à¹‚à¸„à¸£à¸‡à¸ªà¸£à¹‰à¸²à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸µà¹ˆà¹ƒà¸Šà¹‰à¸‡à¸²à¸™à¹„à¸”à¹‰"""
+    """Parse output from show interfaces command into a structured data dictionary."""
     result = {}
     current = None
     for line in raw.splitlines():
-        # à¸«à¸²à¸šà¸£à¸£à¸—à¸±à¸”à¸—à¸µà¹ˆà¸¡à¸µà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¸–à¸²à¸™à¸°à¸‚à¸­à¸‡ interface
+        # Identify interface status line
         m = re.match(r"^(\S+)\s+is\s+(.+),\s+line protocol is\s+(\S+)", line)
         if m:
             current = m.group(1)
             result[current] = {
-                "phys": m.group(2).strip(),  # à¸ªà¸–à¸²à¸™à¸° physical
-                "proto": m.group(3).strip(),  # à¸ªà¸–à¸²à¸™à¸° protocol
-                "reliability": "255",  # à¸„à¹ˆà¸²à¸„à¸§à¸²à¸¡à¹€à¸ªà¸–à¸µà¸¢à¸£ (default)
-                "txload": "1",  # à¸„à¹ˆà¸² load à¸‚à¸²à¸­à¸­à¸ (default)
-                "rxload": "1",  # à¸„à¹ˆà¸² load à¸‚à¸²à¹€à¸‚à¹‰à¸² (default)
-                "input_errors": "0",  # à¸ˆà¸³à¸™à¸§à¸™ input errors (default)
+                "phys": m.group(2).strip(),  # Physical status
+                "proto": m.group(3).strip(),  # Protocol status
+                "reliability": "255",  # Reliability rating (default 255)
+                "txload": "1",  # Output load (default 1)
+                "rxload": "1",  # Input load (default 1)
+                "input_errors": "0",  # Input errors count (default 0)
             }
         if current:
-            # à¸«à¸²à¸„à¹ˆà¸² reliability, txload, rxload
+            # Find reliability, txload, and rxload parameters
             r = re.search(r"reliability (\d+)/255,\s*txload (\d+)/255,\s*rxload (\d+)/255", line)
             if r:
                 result[current]["reliability"] = r.group(1)
                 result[current]["txload"] = r.group(2)
                 result[current]["rxload"] = r.group(3)
-            # à¸«à¸²à¸ˆà¸³à¸™à¸§à¸™ input errors
+            # Find input errors
             e = re.search(r"(\d+) input errors", line)
             if e:
                 result[current]["input_errors"] = e.group(1)
     return result
 
 
-# â”€â”€ à¸Ÿà¸±à¸‡à¸à¹Œà¸Šà¸±à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸³à¸«à¸™à¸” label (à¸›à¸à¸•à¸´/à¸œà¸´à¸”à¸›à¸à¸•à¸´) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Label classification function (normal/anomaly) --------------------------
 def get_label(status_num, protocol_num, network_load, rxload, reliability, input_errors, is_admin_down):
     return collector_rules.get_label(
         status_num,
@@ -121,7 +117,7 @@ def get_label(status_num, protocol_num, network_load, rxload, reliability, input
 
 
 def collect_device(device, on_timeout=None):
-    """à¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥ interface à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸ˆà¸²à¸à¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¹€à¸”à¸µà¸¢à¸§à¸œà¹ˆà¸²à¸™ SNMP"""
+    """Collect all interface data from a single device using SNMP/Simulation."""
     host = device["host"]
     community = device.get("snmp_community", os.getenv("SNMP_COMMUNITY", "public"))
 
@@ -129,7 +125,7 @@ def collect_device(device, on_timeout=None):
         try:
             results = []
 
-            # à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸œà¹ˆà¸²à¸™ SNMP à¸«à¸£à¸·à¸­ simulator à¸ªà¸³à¸«à¸£à¸±à¸š demo
+            # Retrieve data through SNMP or fallback to simulated data for demo
             if simulator_enabled(config) or device.get("simulate"):
                 interfaces_data = simulated_interfaces(device, config)
             else:
@@ -199,7 +195,7 @@ def collect_device(device, on_timeout=None):
                     }
                 )
 
-            # à¹€à¸¡à¸·à¹ˆà¸­à¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ªà¸³à¹€à¸£à¹‡à¸ˆ â†’ update record ALL à¹ƒà¸«à¹‰à¹€à¸›à¹‡à¸™ up (à¸à¸£à¸“à¸µà¹€à¸„à¸¢ down)
+            # When collection succeeds -> update record ALL to 'up' status (in case it was down)
             save_log(
                 device["name"],
                 "ALL",
@@ -216,17 +212,17 @@ def collect_device(device, on_timeout=None):
                 "normal",
             )
 
-            log.info(f"{device['name']}: à¹€à¸à¹‡à¸šà¹„à¸”à¹‰ {len(results)} interface")
+            log.info(f"{device['name']}: Collected {len(results)} interfaces")
             return results
 
         except Exception as e:
-            # à¸ˆà¸±à¸”à¸à¸²à¸£à¸à¸²à¸£ retry à¸–à¹‰à¸²à¹€à¸Šà¸·à¹ˆà¸­à¸¡à¸•à¹ˆà¸­à¸¥à¹‰à¸¡à¹€à¸«à¸¥à¸§
+            # Handle retry logic if device connection fails
             if attempt < MAX_RETRIES - 1:
                 log.warning(f"{device['name']} retry {attempt+1}/{MAX_RETRIES}: {e}")
                 time.sleep(RETRY_DELAY)
             else:
-                log.error(f"{device['name']}: à¸«à¸¡à¸” retry à¹à¸¥à¹‰à¸§ â€” {e}")
-                # à¹à¸ˆà¹‰à¸‡à¹€à¸•à¸·à¸­à¸™ timeout à¸–à¹‰à¸²à¸¡à¸µà¸Ÿà¸±à¸‡à¸à¹Œà¸Šà¸±à¸™ callback
+                log.error(f"{device['name']}: Retries exhausted — {e}")
+                # Invoke timeout callback if provided
                 if on_timeout:
                     on_timeout(
                         {
@@ -237,7 +233,7 @@ def collect_device(device, on_timeout=None):
                         }
                     )
 
-                # à¸šà¸±à¸™à¸—à¸¶à¸ device down à¸¥à¸‡ DB à¹€à¸žà¸·à¹ˆà¸­à¹ƒà¸«à¹‰ predictor à¸•à¸£à¸§à¸ˆà¸ˆà¸±à¸šà¹„à¸”à¹‰
+                # Save a record indicating device is down so predictor can detect it
                 log_id = save_log(
                     device["name"],
                     "ALL",
@@ -281,12 +277,12 @@ def collect_device(device, on_timeout=None):
     return []
 
 
-# â”€â”€ à¸Ÿà¸±à¸‡à¸à¹Œà¸Šà¸±à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ˆà¸²à¸à¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¸—à¸±à¹‰à¸‡à¸«à¸¡à¸” (à¸žà¸£à¹‰à¸­à¸¡à¸à¸±à¸™) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# -- Multithreaded collection function for all devices ------------------------
 def collect_all(on_timeout=None):
-    """à¹€à¸à¹‡à¸šà¸‚à¹‰à¸­à¸¡à¸¹à¸¥ interface à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¸ˆà¸²à¸à¸­à¸¸à¸›à¸à¸£à¸“à¹Œà¸—à¸¸à¸à¸•à¸±à¸§ â€” à¹ƒà¸Šà¹‰ ThreadPoolExecutor"""
+    """Collect interface data from all configured devices concurrently using ThreadPoolExecutor."""
     all_results = []
     devices = devices_config["devices"]
-    max_workers = min(len(devices), 8)  # à¹„à¸¡à¹ˆà¹€à¸à¸´à¸™ 8 threads
+    max_workers = min(len(devices), 8)  # limit to max 8 concurrent threads
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {executor.submit(collect_device, device, on_timeout): device["name"] for device in devices}
@@ -296,6 +292,6 @@ def collect_all(on_timeout=None):
                 results = future.result()
                 all_results.extend(results)
             except Exception as e:
-                log.error(f"{device_name}: ThreadPool error â€” {e}")
+                log.error(f"{device_name}: ThreadPool error — {e}")
 
     return all_results

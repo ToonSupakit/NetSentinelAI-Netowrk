@@ -270,7 +270,7 @@ async function loadStatus(){
     tr.appendChild(labelTd);
 
     const actionsTd=document.createElement('td');
-    if(row.status==='down'&&isAdmin){
+    if((row.status==='down'||row.status==='admin_down')&&isAdmin){
       actionsTd.appendChild(actionButton('Fix','act-btn act-fix',()=>fixNow(row.device,row.interface)));
     }else if(row.status==='up'&&isAdmin){
       actionsTd.appendChild(actionButton('Limit','act-btn act-rl',()=>rateLimit(row.device,row.interface)));
@@ -310,7 +310,7 @@ if(totAnom>0&&fr[2]!=null&&!Number.isNaN(Number(fr[2]))){document.getElementById
 const socket=io();
 socket.on('anomaly',d=>{showToast('ANOMALY: '+d.device+' – '+d.intf,'e');loadFeed();loadStatus()});
 socket.on('device_down',d=>{showToast('DEVICE DOWN: '+d.device,'e');loadFeed();loadStatus();loadAnalytics()});
-socket.on('remediation_result',d=>{if(d.success){showToast(d.message,'s');loadStatus();}else{showToast(d.message,'e');}});
+socket.on('remediation_result',d=>{if(d.success){showToast(d.message,'s');refresh();setTimeout(refresh,3000);setTimeout(refresh,8000);}else{showToast(d.message,'e');}});
 async function refresh(){await Promise.all([loadStatus(),loadFeed(),loadAnalytics()])}
 refresh();setInterval(refresh,10000);
 </script>

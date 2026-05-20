@@ -2,6 +2,11 @@
 
 NetSentinel AI is a network anomaly monitoring app for lab and small network environments. It collects interface data through SNMP, classifies anomalies with rule checks plus an Isolation Forest model, sends Discord alerts, and provides a Flask dashboard for status, traffic, settings, users, retraining, and remediation actions.
 
+## System Architecture
+
+![System Architecture](screenshots/architecture.png)
+
+
 ## Current Capabilities
 
 - Collect interface status, protocol, reliability, TX/RX load, input errors, link type, zone, location, and topology role.

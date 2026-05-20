@@ -235,6 +235,17 @@ def get_snmp_interfaces(host, community, oid_overrides=None):
             for i in interfaces:
                 i["network_load"] = 1
 
+        # ── Enhanced: TX≈0 แต่ RX สูงผิดปกติบนหลาย interface → ค่าขยะจาก GNS3 ──
+        # หลัง port bounce GNS3 อาจคืนค่า locIfInLoad สูงแต่ไม่เท่ากัน
+        # ในโลกจริง ถ้า TX≈0 ทุก interface แล้ว RX สูง >20% บนส่วนใหญ่ ไม่สมเหตุสมผล
+        all_tx_low = all(v <= 5 for v in tx_vals)
+        high_rx_count = sum(1 for v in rx_vals if v > 20)
+        if all_tx_low and high_rx_count >= len(up_intfs) * 0.5:
+            log.warning(f"GNS3 junk detected on {host}: TX≈0 but RX high on {high_rx_count}/{len(up_intfs)} intfs {rx_vals}, resetting RX to 1")
+            for i in interfaces:
+                if i["status"] == "up":
+                    i["rxload"] = 1
+
     return interfaces
 
 
