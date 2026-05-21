@@ -1,26 +1,33 @@
 # NetSentinel AI
 
-NetSentinel AI is a network anomaly monitoring app for lab and small network environments. It collects interface data through SNMP, classifies anomalies with rule checks plus an Isolation Forest model, sends Discord alerts, and provides a Flask dashboard for status, traffic, settings, users, retraining, and remediation actions.
+NetSentinel AI is a network monitoring and auto-remediation tool built for lab/GNS3 environments. It collects interface data using SNMP, uses basic network rules combined with an Isolation Forest Machine Learning model to detect anomalies, sends alerts to Discord, and provides a Flask web dashboard to view status and trigger port fixes or rate-limits.
 
 ## System Architecture
 
 <img width="2048" height="1117" alt="diagram-AI" src="https://github.com/user-attachments/assets/9e515fe0-75c4-49a0-8e59-3d6ee3a0042e" />
 
+## Key Features
 
-## Current Capabilities
+* **Rules + Machine Learning:** Checks interface health using normal network thresholds (like high load, error counts, or low reliability) and uses a Scikit-Learn Isolation Forest model (ML) to spot unusual behaviors.
+* **Automatic Retraining:** Automatically retrains the ML model every 24 hours (or on-demand from the settings page) using the history metrics stored in the database so it adapts to network traffic shifts.
+* **Port Fixing (Auto & Manual):** If a port has an anomaly, the system can automatically run configuration commands to fix it (Auto-Remediation), or you can click "Fix" or "Limit" on the dashboard to trigger it manually.
+* **Interactive Discord Bot:** Sends real-time warning cards to Discord. You can actually click buttons directly on the Discord message (like Approve Fix, Rate Limit, Check Status) to control the routers from chat.
+* **Multi-Vendor Support:** Translates simple commands like "fix" or "limit" into actual CLI commands for Cisco, Arista, MikroTik, or Juniper routers using Netmiko.
+* **Clean Web UI:** A simple Flask web app in dark mode that shows a grid of port statuses (green for healthy, red for error), traffic trends, settings, and logs.
+* **User Roles & Security:** Has login authentication with two roles (Admin vs. normal User) and CSRF protection to make sure only authorized accounts can run fix commands.
+* **Automated Tests:** Includes a test suite built with `pytest` that runs through GitHub Actions CI to make sure database security, SNMP parsing, and prediction logic work correctly.
 
-- Collect interface status, protocol, reliability, TX/RX load, input errors, link type, zone, location, and topology role.
-- Support SNMPv2c and SNMPv3 through `app/snmp_helper.py`.
-- Support demo/mock traffic through the simulator in `app/simulator.py`.
-- Detect anomalies with rules, AI, or both: `rules`, `ai`, `rules+ai`, `device_unreachable`, and `healthy`.
-- Enrich runtime prediction with recent deltas, error rate, uptime percentage, and baseline deltas.
-- Correlate downstream failures with likely upstream/root events and suppress duplicate notifications.
-- Send Discord alerts with admin-only buttons: approve fix, check status, rate limit, remove limit, ignore.
-- Provide Flask pages for dashboard, traffic, login, and admin settings.
-- Provide admin APIs for config, device config, environment variables, user management, model status, and retraining.
-- Generate vendor-specific remediation commands for Cisco, Arista, MikroTik, Juniper, and local adapter plugins.
-- Store data in MySQL through SQLAlchemy.
-- Run automated pytest coverage through GitHub Actions.
+## Tools & Technologies
+
+* **Core Language:** Python 3.10+
+* **Machine Learning:** Scikit-learn (Isolation Forest)
+* **Network Protocols & Automation:** Netmiko (SSH/Telnet), SNMP (v2c/v3 via PySNMP)
+* **Web App Backend:** Flask, Flask-SocketIO (for real-time dashboard updates)
+* **Web Front-end:** HTML5, CSS3, Vanilla Javascript (no bulky frameworks)
+* **Database:** MySQL / SQLite, SQLAlchemy ORM
+* **Notifications & ChatOps:** Discord.py (Discord API)
+* **Development & Quality:** Pytest, Ruff, Black
+* **Network Environment:** GNS3 (simulating Cisco IOS routers)
 
 ## Project Layout
 
