@@ -4,7 +4,7 @@ NetSentinel AI is a network anomaly monitoring app for lab and small network env
 
 ## System Architecture
 
-![System Architecture](screenshots/architecture.png)
+<img width="2048" height="1117" alt="diagram-AI" src="https://github.com/user-attachments/assets/9e515fe0-75c4-49a0-8e59-3d6ee3a0042e" />
 
 
 ## Current Capabilities
