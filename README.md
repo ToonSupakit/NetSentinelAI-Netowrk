@@ -13,7 +13,7 @@ NetSentinel AI is a network monitoring and automated remediation system built fo
 * **Automatic Retraining:** Automatically retrains the ML model every 24 hours (or on-demand from the settings page) using the history metrics stored in the database so it adapts to network traffic shifts.
 * **Port Fixing (Auto & Manual):** If a port has an anomaly, the system can automatically run configuration commands to fix it (Auto-Remediation), or you can click "Fix" or "Limit" on the dashboard to trigger it manually.
 * **Interactive Discord Bot:** Sends real-time warning cards to Discord. You can actually click buttons directly on the Discord message (like Approve Fix, Rate Limit, Check Status) to control the routers from chat.
-* **Multi-Vendor Support:** Translates simple commands like "fix" or "limit" into actual CLI commands for simulated Cisco and MikroTik devices using Netmiko.
+* **Device Support:** Translates simple commands like "fix" or "limit" into actual CLI commands for simulated Cisco devices using Netmiko.
 * **Clean Web UI:** A simple Flask web app in dark mode that shows a grid of port statuses (green for healthy, red for error), traffic trends, settings, and logs.
 * **User Roles & Security:** Has login authentication with two roles (Admin vs. normal User) and CSRF protection to make sure only authorized accounts can run fix commands.
 * **Automated Tests:** Includes a test suite built with `pytest` that runs through GitHub Actions CI to make sure database security, SNMP parsing, and prediction logic work correctly.
@@ -210,7 +210,6 @@ Supported Netmiko examples include:
 - `cisco_ios`
 - `cisco_ios_telnet`
 - `cisco_nxos`
-- `mikrotik_routeros`
 
 ## Device SNMP Setup
 
