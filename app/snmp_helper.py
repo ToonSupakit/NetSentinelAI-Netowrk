@@ -29,6 +29,13 @@ def get_snmp_auth(community):
     if v3_user:
         v3_auth = os.getenv("SNMP_V3_AUTH")
         v3_priv = os.getenv("SNMP_V3_PRIV")
+        if not v3_priv or v3_priv.strip() == "":
+            # โหมด authNoPriv (ยืนยันตัวตนอย่างเดียว ไม่เข้ารหัส) สำหรับเครื่อง Non-Crypto
+            return UsmUserData(
+                v3_user,
+                authKey=v3_auth,
+                authProtocol=usmHMACSHAAuthProtocol
+            )
         return UsmUserData(
             v3_user,
             authKey=v3_auth,
@@ -160,6 +167,8 @@ def get_snmp_interfaces(host, community, oid_overrides=None):
 
     interfaces = []
     ifDescr = data.get("ifDescr", {})
+    if not ifDescr:
+        raise ConnectionError(f"No SNMP response received from {host} (ifDescr is empty or timed out)")
     now = time.time()
 
     for idx, name in ifDescr.items():

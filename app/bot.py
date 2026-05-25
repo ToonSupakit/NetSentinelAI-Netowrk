@@ -95,7 +95,8 @@ async def send_anomaly_alert(anomaly):
 
     embed = discord.Embed(title="🚨 ANOMALY DETECTED!", color=discord.Color.red(), timestamp=datetime.now())
     embed.add_field(name="Device", value=anomaly["device"], inline=True)
-    embed.add_field(name="Interface", value=f"{anomaly['intf']} ({anomaly.get('ip', 'N/A')})", inline=True)
+    intf_val = f"{anomaly['intf']} ({anomaly.get('ip', 'N/A')})" if anomaly["intf"] != "ALL" else f"Device Level ({anomaly.get('ip', 'N/A')})"
+    embed.add_field(name="Interface", value=intf_val, inline=True)
     embed.add_field(name="Link Type", value=anomaly["link_type"], inline=True)
     embed.add_field(name="Severity", value=str(anomaly.get("severity", "unknown")).upper(), inline=True)
     embed.add_field(name="Confidence", value=f"{anomaly['confidence']:.0%}", inline=True)
@@ -147,7 +148,8 @@ class AnomalyView(discord.ui.View):
         if not device:
             await interaction.followup.send("❌ ไม่พบข้อมูล device")
             return
-        await interaction.followup.send(f"⏳ กำลัง fix {self.anomaly['device']} - {self.anomaly['intf']}...")
+        intf_suffix = f" - {self.anomaly['intf']}" if self.anomaly['intf'] != "ALL" else ""
+        await interaction.followup.send(f"⏳ กำลัง fix {self.anomaly['device']}{intf_suffix}...")
         try:
             conn_params = get_device_conn_params(device)
             loop = asyncio.get_event_loop()
@@ -155,13 +157,14 @@ class AnomalyView(discord.ui.View):
             mark_as_fixed(self.anomaly["log_id"])
             embed = discord.Embed(title="✅ Fix สำเร็จ!", color=discord.Color.green(), timestamp=datetime.now())
             embed.add_field(name="Device", value=self.anomaly["device"], inline=True)
-            embed.add_field(name="Interface", value=self.anomaly["intf"], inline=True)
+            if self.anomaly["intf"] != "ALL":
+                embed.add_field(name="Interface", value=self.anomaly["intf"], inline=True)
             embed.add_field(name="Action", value="no shutdown", inline=True)
             embed.add_field(name="Result", value=result[:500], inline=False)
             await interaction.followup.send(embed=embed)
             button.disabled = True
             await interaction.message.edit(view=self)
-            log.info(f"Discord Bot fix_now success: {self.anomaly['device']} - {self.anomaly['intf']}")
+            log.info(f"Discord Bot fix_now success: {self.anomaly['device']}{intf_suffix}")
         except Exception as e:
             await interaction.followup.send(f"❌ Fix ไม่สำเร็จ: {e}")
             log.error(f"Discord Bot fix_now failed: {e}")
@@ -177,8 +180,9 @@ class AnomalyView(discord.ui.View):
             conn_params = get_device_conn_params(device)
             loop = asyncio.get_event_loop()
             status = await loop.run_in_executor(None, lambda: check_interface_status(conn_params, self.anomaly["intf"]))
+            title_val = f"📊 Status: {self.anomaly['device']}" if self.anomaly['intf'] == "ALL" else f"📊 Status: {self.anomaly['device']} - {self.anomaly['intf']}"
             embed = discord.Embed(
-                title=f"📊 Status: {self.anomaly['device']} - {self.anomaly['intf']}",
+                title=title_val,
                 color=discord.Color.blue(),
                 timestamp=datetime.now(),
             )
@@ -199,7 +203,8 @@ class AnomalyView(discord.ui.View):
         if not device:
             await interaction.followup.send("❌ ไม่พบข้อมูล device")
             return
-        await interaction.followup.send(f"⏳ กำลัง Rate Limit {self.anomaly['device']} - {self.anomaly['intf']}...")
+        intf_suffix = f" - {self.anomaly['intf']}" if self.anomaly['intf'] != "ALL" else ""
+        await interaction.followup.send(f"⏳ กำลัง Rate Limit {self.anomaly['device']}{intf_suffix}...")
         try:
             conn_params = get_device_conn_params(device)
             loop = asyncio.get_event_loop()
@@ -208,14 +213,15 @@ class AnomalyView(discord.ui.View):
                 title="🚦 Rate Limit Applied!", color=discord.Color.yellow(), timestamp=datetime.now()
             )
             embed.add_field(name="Device", value=self.anomaly["device"], inline=True)
-            embed.add_field(name="Interface", value=self.anomaly["intf"], inline=True)
+            if self.anomaly["intf"] != "ALL":
+                embed.add_field(name="Interface", value=self.anomaly["intf"], inline=True)
             embed.add_field(name="Action", value="Rate Limit 50Mbps", inline=True)
             embed.add_field(name="Result", value=result[:500], inline=False)
             embed.set_footer(text="⚠️ Rate limit นี้เป็นแค่ชั่วคราว ควรหาสาเหตุที่แท้จริงด้วย")
             await interaction.followup.send(embed=embed)
             button.disabled = True
             await interaction.message.edit(view=self)
-            log.info(f"Discord Bot rate_limit success: {self.anomaly['device']} - {self.anomaly['intf']}")
+            log.info(f"Discord Bot rate_limit success: {self.anomaly['device']}{intf_suffix}")
         except Exception as e:
             await interaction.followup.send(f"❌ Rate Limit ไม่สำเร็จ: {e}")
             log.error(f"Discord Bot rate_limit failed: {e}")
@@ -237,12 +243,14 @@ class AnomalyView(discord.ui.View):
             )
             embed = discord.Embed(title="🔓 Rate Limit Removed!", color=discord.Color.green(), timestamp=datetime.now())
             embed.add_field(name="Device", value=self.anomaly["device"], inline=True)
-            embed.add_field(name="Interface", value=self.anomaly["intf"], inline=True)
+            if self.anomaly["intf"] != "ALL":
+                embed.add_field(name="Interface", value=self.anomaly["intf"], inline=True)
             embed.add_field(name="Result", value=result[:500], inline=False)
             await interaction.followup.send(embed=embed)
             button.disabled = True
             await interaction.message.edit(view=self)
-            log.info(f"Discord Bot remove_rate_limit success: {self.anomaly['device']} - {self.anomaly['intf']}")
+            intf_suffix = f" - {self.anomaly['intf']}" if self.anomaly['intf'] != "ALL" else ""
+            log.info(f"Discord Bot remove_rate_limit success: {self.anomaly['device']}{intf_suffix}")
         except Exception as e:
             await interaction.followup.send(f"❌ Remove Rate Limit ไม่สำเร็จ: {e}")
             log.error(f"Discord Bot remove_rate_limit failed: {e}")
@@ -251,7 +259,8 @@ class AnomalyView(discord.ui.View):
     async def ignore(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self._check_admin(interaction):
             return
-        await interaction.response.send_message(f"⏭️ Ignored: {self.anomaly['device']} - {self.anomaly['intf']}")
+        intf_suffix = f" - {self.anomaly['intf']}" if self.anomaly['intf'] != "ALL" else ""
+        await interaction.response.send_message(f"⏭️ Ignored: {self.anomaly['device']}{intf_suffix}")
         for child in self.children:
             child.disabled = True
         await interaction.message.edit(view=self)
@@ -310,8 +319,9 @@ async def on_message(message):
         for row in rows:
             status = "✅ Fixed" if row[5] else "🔴 Not Fixed"
             src = row[10] if len(row) > 10 and row[10] else "—"
+            name_val = f"{row[1]}" if row[2] == "ALL" else f"{row[1]} - {row[2]}"
             embed.add_field(
-                name=f"{row[1]} - {row[2]}",
+                name=name_val,
                 value=(
                     f"เวลา: {row[0].strftime('%Y-%m-%d %H:%M:%S')}\n"
                     f"Status: {status}\n"
@@ -331,8 +341,9 @@ async def on_message(message):
         for row in rows:
             label = row[8]
             status_emoji = "✅" if label == "normal" else "🚨"
+            name_val = f"{row[0]}" if row[1] == "ALL" else f"{row[0]} - {row[1]}"
             embed.add_field(
-                name=f"{status_emoji} {row[0]} - {row[1]}",
+                name=status_emoji + " " + name_val,
                 value=f"IP: {row[2]}\nStatus: {row[3]}/{row[4]}\nLoad: {row[5]}/{row[6]}",
                 inline=True,
             )

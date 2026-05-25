@@ -92,6 +92,21 @@ def init_db():
                 created_at  TIMESTAMP DEFAULT current_timestamp()
             )
         """))
+        # Create device_syslogs table for storing syslog entries from devices
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS device_syslogs (
+                id             INT AUTO_INCREMENT PRIMARY KEY,
+                device_name    VARCHAR(50),
+                ip_address     VARCHAR(20),
+                facility       VARCHAR(20),
+                severity       VARCHAR(20),
+                mnemonic       VARCHAR(50),
+                message        TEXT,
+                ai_cause       TEXT,
+                ai_suggestion  TEXT,
+                received_at    DATETIME
+            )
+        """))
 
         # -- Create Indexes for Query Performance Optimization ----------------------
         index_statements = [
@@ -100,6 +115,9 @@ def init_db():
             "CREATE INDEX idx_logs_collected_at ON interface_logs(collected_at)",
             "CREATE INDEX idx_pred_label_date ON ai_predictions(prediction_label, predicted_at)",
             "CREATE INDEX idx_pred_log_id ON ai_predictions(log_id)",
+            "CREATE INDEX idx_syslogs_device ON device_syslogs(device_name)",
+            "CREATE INDEX idx_syslogs_severity ON device_syslogs(severity)",
+            "CREATE INDEX idx_syslogs_received_at ON device_syslogs(received_at)",
         ]
         for stmt in index_statements:
             try:
@@ -163,8 +181,17 @@ def cleanup_old_data(days=30):
                 {"days": days},
             )
 
+            # Delete old device syslogs
+            result3 = conn.execute(
+                text("""
+                DELETE FROM device_syslogs
+                WHERE received_at < DATE_SUB(NOW(), INTERVAL :days DAY)
+            """),
+                {"days": days},
+            )
+
             conn.commit()
-            total = result1.rowcount + result2.rowcount
+            total = result1.rowcount + result2.rowcount + result3.rowcount
             if total > 0:
                 log.info(f"Cleanup: Deleted {total} old records (> {days} days)")
     except Exception as e:
@@ -462,23 +489,44 @@ def mark_anomalies_fixed_for_interface(device_name, interface_name):
         conn.commit()
 
 
-def get_device_status():
+def get_device_status(active_devices=None):
     """Retrieve the latest status record for all interfaces across devices."""
     with engine.connect() as conn:
-        result = conn.execute(text("""
-            SELECT l.device_name, l.interface_name, l.ip_address,
-                    l.status, l.protocol, l.network_load, l.rxload,
-                    l.reliability, l.label, l.collected_at
-            FROM interface_logs l
-            INNER JOIN (
-                SELECT device_name, interface_name, MAX(collected_at) as max_time
-                FROM interface_logs
-                GROUP BY device_name, interface_name
-            ) latest ON l.device_name = latest.device_name
-                    AND l.interface_name = latest.interface_name
-                    AND l.collected_at = latest.max_time
-            ORDER BY l.device_name, l.interface_name
-        """))
+        if active_devices:
+            placeholders = ", ".join(f":dev_{i}" for i in range(len(active_devices)))
+            bind_params = {f"dev_{i}": dev for i, dev in enumerate(active_devices)}
+            query = f"""
+                SELECT l.device_name, l.interface_name, l.ip_address,
+                        l.status, l.protocol, l.network_load, l.rxload,
+                        l.reliability, l.label, l.collected_at
+                FROM interface_logs l
+                INNER JOIN (
+                    SELECT device_name, interface_name, MAX(collected_at) as max_time
+                    FROM interface_logs
+                    WHERE device_name IN ({placeholders})
+                    GROUP BY device_name, interface_name
+                ) latest ON l.device_name = latest.device_name
+                        AND l.interface_name = latest.interface_name
+                        AND l.collected_at = latest.max_time
+                WHERE l.device_name IN ({placeholders})
+                ORDER BY l.device_name, l.interface_name
+            """
+            result = conn.execute(text(query), bind_params)
+        else:
+            result = conn.execute(text("""
+                SELECT l.device_name, l.interface_name, l.ip_address,
+                        l.status, l.protocol, l.network_load, l.rxload,
+                        l.reliability, l.label, l.collected_at
+                FROM interface_logs l
+                INNER JOIN (
+                    SELECT device_name, interface_name, MAX(collected_at) as max_time
+                    FROM interface_logs
+                    GROUP BY device_name, interface_name
+                ) latest ON l.device_name = latest.device_name
+                        AND l.interface_name = latest.interface_name
+                        AND l.collected_at = latest.max_time
+                ORDER BY l.device_name, l.interface_name
+            """))
         return result.fetchall()
 
 

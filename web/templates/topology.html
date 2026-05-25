@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>NetSentinel AI — Topology Map</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="/static/theme.css" rel="stylesheet">
+<script src="/static/theme.js"></script>
+<link href="/static/sidebar.css" rel="stylesheet">
+<style>
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);display:flex;min-height:100vh;overflow:hidden}
+.main{flex:1;padding:2.25rem;display:flex;flex-direction:column;min-width:0;position:relative}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-shrink:0}
+.header h2{font-size:1.25rem;font-weight:700}
+.status-pill{font-size:.8rem;color:var(--txt-m);display:flex;align-items:center;gap:.5rem;background:var(--card);padding:.5rem .8rem;border-radius:999px;border:1px solid var(--brd);box-shadow:var(--shadow-sm)}
+.dot{width:6px;height:6px;background:var(--ok);border-radius:50%;box-shadow:0 0 8px var(--ok)}
+
+/* Map container styling - Minimalist Grid Background */
+.map-container{
+  flex:1;
+  background: var(--card);
+  border: 1px solid var(--brd);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  background-image: 
+    radial-gradient(var(--brd-soft) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+#cy {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* Slide-in Details Panel - Pure Minimalist Styling */
+.details-panel {
+  position: absolute;
+  top: 2.25rem;
+  right: 2.25rem;
+  bottom: 2.25rem;
+  width: 380px;
+  background: rgba(var(--card-rgb, 20, 20, 25), 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--brd);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  transform: translateX(450px);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  z-index: 10;
+  overflow-y: auto;
+}
+.details-panel.open {
+  transform: translateX(0);
+}
+.panel-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  color: var(--txt-m);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  transition: background 0.2s, color 0.2s;
+}
+.panel-close:hover {
+  background: var(--panel-2);
+  color: var(--txt);
+}
+.panel-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+  padding-right: 2rem;
+}
+.side-card {
+  background: var(--panel-2);
+  border: 1px solid var(--brd-soft);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.side-card h4 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  margin-bottom: 0.4rem;
+}
+.metric-row:last-child {
+  margin-bottom: 0;
+}
+.metric-label {
+  color: var(--txt-m);
+}
+.metric-value {
+  font-weight: 500;
+}
+
+/* Minimalist Badge Styles */
+.badge {
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.badge-up { background: var(--ok-bg); color: var(--ok); }
+.badge-down { background: var(--err-bg); color: var(--err); }
+.badge-normal { background: var(--ok-bg); color: var(--ok); }
+.badge-anomaly { background: var(--err-bg); color: var(--err); }
+
+/* Minimalist Action Buttons */
+.btn-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.act-btn {
+  flex: 1;
+  border: none;
+  padding: 0.45rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  text-align: center;
+  display: block;
+}
+.btn-fix {
+  background: var(--ok-bg);
+  color: var(--ok);
+  border: 1px solid rgba(16,185,129,0.2);
+}
+.btn-fix:hover {
+  background: var(--ok);
+  color: #fff;
+}
+.btn-limit {
+  background: var(--wrn-bg);
+  color: var(--wrn);
+  border: 1px solid rgba(245,158,11,0.2);
+}
+.btn-limit:hover {
+  background: var(--wrn);
+  color: #fff;
+}
+.btn-unlimit {
+  background: rgba(99,102,241,0.1);
+  color: #818cf8;
+  border: 1px solid rgba(99,102,241,0.2);
+}
+.btn-unlimit:hover {
+  background: #6366f1;
+  color: #fff;
+}
+
+.help-text {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  font-size: 0.72rem;
+  color: var(--txt-m);
+  pointer-events: none;
+  background: rgba(var(--card-rgb, 20, 20, 25), 0.7);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.reset-layout-btn {
+  background: var(--panel-2);
+  color: var(--txt-m);
+  border: 1px solid var(--brd);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.reset-layout-btn:hover {
+  background: var(--brd-soft);
+  color: var(--txt);
+  border-color: var(--txt-m);
+}
+</style>
+</head>
+<body>
+
+{% include 'sidebar.html' %}
+
+<div class="main">
+  <div class="header">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <h2>Topology Map</h2>
+      <button class="reset-layout-btn" onclick="resetLayout()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 2px;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        Auto Arrange
+      </button>
+    </div>
+    <div class="status-pill"><div class="dot"></div><span id="last-update">Connecting...</span></div>
+  </div>
+
+  <div class="map-container">
+    <div id="cy"></div>
+    <div class="help-text">Click nodes or links to inspect status and execute operations.</div>
+
+    <!-- Minimalist Details Slide-in Panel -->
+    <div class="details-panel" id="panel">
+      <button class="panel-close" onclick="closePanel()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <div class="panel-title" id="panel-title">Link Details</div>
+      <div id="panel-content"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function csrfHeaders(extra={}){return {'X-CSRF-Token':document.querySelector('meta[name="csrf-token"]').content,...extra}}
+const Toast = Swal.mixin({
+  toast: true,
+  position: 'bottom-end',
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+  background: themeColor('--card'),
+  color: themeColor('--txt'),
+  didOpen: (toast) => {
+    toast.addEventListener('mouseenter', Swal.stopTimer)
+    toast.addEventListener('mouseleave', Swal.resumeTimer)
+  }
+});
+function showToast(m,err=false){
+  Toast.fire({
+    icon: err ? 'error' : 'success',
+    title: m
+  });
+}
+
+// ── Cytoscape Initialization ──
+let cy = cytoscape({
+  container: document.getElementById('cy'),
+  elements: [],
+  style: [
+    {
+      selector: 'node',
+      style: {
+        'label': 'data(name)',
+        'background-color': themeColor('--panel-2') || '#1a1f2c',
+        'border-width': '2px',
+        'border-color': themeColor('--txt-m') || '#4a5568',
+        'color': themeColor('--txt') || '#e2e8f0',
+        'font-family': 'Inter, sans-serif',
+        'font-size': '10px',
+        'font-weight': '600',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'width': '52px',
+        'height': '52px',
+        'overlay-opacity': 0,
+        'transition-property': 'background-color, border-color, width, height',
+        'transition-duration': '0.2s'
+      }
+    },
+    {
+      selector: 'node:selected',
+      style: {
+        'border-color': themeColor('--ac') || '#6366f1',
+        'border-width': '3px',
+        'width': '56px',
+        'height': '56px'
+      }
+    },
+    {
+      selector: 'node[status="down"]',
+      style: {
+        'border-color': '#ef4444',
+        'border-width': '3px',
+        'background-color': '#2d1417'
+      }
+    },
+    {
+      selector: 'edge',
+      style: {
+        'width': '3px',
+        'line-color': '#10b981', // Clean primary green (up)
+        'opacity': 0.75,
+        'curve-style': 'bezier',
+        'overlay-opacity': 0,
+        'transition-property': 'line-color, width, opacity',
+        'transition-duration': '0.2s'
+      }
+    },
+    {
+      selector: 'edge[status="down"]',
+      style: {
+        'line-color': '#ef4444', // Clean red (down)
+        'width': '3.5px'
+      }
+    },
+    {
+      selector: 'edge[label="anomaly"]',
+      style: {
+        'line-color': '#f59e0b', // Clean orange (anomaly)
+      }
+    },
+    {
+      selector: 'edge:selected',
+      style: {
+        'width': '5px',
+        'opacity': 1.0
+      }
+    }
+  ],
+  layout: {
+    name: 'circle',
+    radius: 130
+  },
+  userZoomingEnabled: true,
+  userPanningEnabled: true,
+  boxSelectionEnabled: false
+});
+
+// Interactive hover animations
+cy.on('mouseover', 'edge', function(evt){
+  document.body.style.cursor = 'pointer';
+  evt.target.style({ 'width': '5px', 'opacity': 1.0 });
+});
+cy.on('mouseout', 'edge', function(evt){
+  document.body.style.cursor = 'default';
+  if (!evt.target.selected()) {
+    evt.target.style({ 'width': '3px', 'opacity': 0.75 });
+  }
+});
+cy.on('mouseover', 'node', function(){
+  document.body.style.cursor = 'pointer';
+});
+cy.on('mouseout', 'node', function(){
+  document.body.style.cursor = 'default';
+});
+
+// Click nodes or edges to show side panel
+cy.on('tap', function(evt){
+  if (evt.target === cy) {
+    closePanel();
+  }
+});
+cy.on('tap', 'node', function(evt){
+  showNodeDetails(evt.target.data());
+});
+cy.on('tap', 'edge', function(evt){
+  showEdgeDetails(evt.target.data());
+});
+
+function closePanel() {
+  document.getElementById('panel').classList.remove('open');
+  cy.elements().unselect();
+}
+
+function showNodeDetails(node) {
+  document.getElementById('panel-title').textContent = `${node.name} Details`;
+  const content = `
+    <div class="side-card">
+      <div class="metric-row">
+        <span class="metric-label">Device Name</span>
+        <span class="metric-value">${node.name}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Role</span>
+        <span class="metric-value">${node.role}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Zone</span>
+        <span class="metric-value">${node.zone}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Management Host</span>
+        <span class="metric-value">${node.host}</span>
+      </div>
+    </div>
+  `;
+  document.getElementById('panel-content').innerHTML = content;
+  document.getElementById('panel').classList.add('open');
+}
+
+function showEdgeDetails(edge) {
+  document.getElementById('panel-title').textContent = `Backbone Link Details`;
+  
+  const statusBadge = `<span class="badge badge-${edge.status}">${edge.status}</span>`;
+  const labelBadge = `<span class="badge badge-${edge.label}">${edge.label}</span>`;
+  
+  const tx1 = Math.round(edge.source_txload / 255 * 100);
+  const rx1 = Math.round(edge.source_rxload / 255 * 100);
+  const tx2 = Math.round(edge.target_txload / 255 * 100);
+  const rx2 = Math.round(edge.target_rxload / 255 * 100);
+
+  const content = `
+    <div class="side-card">
+      <div class="metric-row">
+        <span class="metric-label">Link Status</span>
+        <span class="metric-value">${statusBadge}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Traffic Label</span>
+        <span class="metric-value">${labelBadge}</span>
+      </div>
+    </div>
+
+    <div class="side-card">
+      <h4>
+        <span>${edge.source} Side</span>
+        <span class="badge badge-${edge.source_status}">${edge.source_status}</span>
+      </h4>
+      <div class="metric-row">
+        <span class="metric-label">Interface</span>
+        <span class="metric-value">${edge.source_interface}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">IP Address</span>
+        <span class="metric-value">${edge.source_ip}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">TX Load</span>
+        <span class="metric-value">${tx1}%</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">RX Load</span>
+        <span class="metric-value">${rx1}%</span>
+      </div>
+      <div class="btn-group">
+        <button class="act-btn btn-fix" onclick="fixPort('${edge.source}', '${edge.source_interface}')">Fix Port</button>
+        ${edge.source_status === 'up' ? 
+          `<button class="act-btn btn-limit" onclick="rateLimit('${edge.source}', '${edge.source_interface}')">Limit</button>
+           <button class="act-btn btn-unlimit" onclick="removeLimit('${edge.source}', '${edge.source_interface}')">Unlimit</button>` : ''
+        }
+      </div>
+    </div>
+
+    <div class="side-card">
+      <h4>
+        <span>${edge.target} Side</span>
+        <span class="badge badge-${edge.target_status}">${edge.target_status}</span>
+      </h4>
+      <div class="metric-row">
+        <span class="metric-label">Interface</span>
+        <span class="metric-value">${edge.target_interface}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">IP Address</span>
+        <span class="metric-value">${edge.target_ip}</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">TX Load</span>
+        <span class="metric-value">${tx2}%</span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">RX Load</span>
+        <span class="metric-value">${rx2}%</span>
+      </div>
+      <div class="btn-group">
+        <button class="act-btn btn-fix" onclick="fixPort('${edge.target}', '${edge.target_interface}')">Fix Port</button>
+        ${edge.target_status === 'up' ? 
+          `<button class="act-btn btn-limit" onclick="rateLimit('${edge.target}', '${edge.target_interface}')">Limit</button>
+           <button class="act-btn btn-unlimit" onclick="removeLimit('${edge.target}', '${edge.target_interface}')">Unlimit</button>` : ''
+        }
+      </div>
+    </div>
+  `;
+  document.getElementById('panel-content').innerHTML = content;
+  document.getElementById('panel').classList.add('open');
+}
+
+// ── Remediation Actions (Borrowed from Dashboard.html) ──
+async function fixPort(d, i) {
+  Swal.fire({
+    title: 'Confirm Port Bounce',
+    text: `Bounce interface ${i} on ${d}?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, bounce',
+    cancelButtonText: 'Cancel',
+    background: themeColor('--card'),
+    color: themeColor('--txt'),
+    confirmButtonColor: '#10b981',
+    cancelButtonColor: '#3a3f58',
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      try {
+        const r = await fetch(`/api/fix/${encodeURIComponent(d)}/${encodeURIComponent(i)}`, {method:'POST',headers:csrfHeaders()});
+        const j = await r.json();
+        if (j.success) {
+          RemediationManager.start(d, i, 'fix', 'Bouncing Port...', `Bouncing interface <b>${i}</b> on <b>${d}</b>.<br>Please wait, GNS3 devices may take up to 15 seconds to apply.`);
+        } else {
+          showToast('Failed: ' + j.message, true);
+        }
+      } catch(e) {
+        showToast('Error: ' + e, true);
+      }
+    }
+  });
+}
+
+async function rateLimit(d, i) {
+  Swal.fire({
+    title: 'Configure Rate Limit',
+    html:
+      `<div style="text-align: left; margin-bottom: 12px;">` +
+      `  <label style="display: block; font-size: 0.75rem; color: var(--txt-m); margin-bottom: 4px; font-weight: 600; text-transform: uppercase;">Bandwidth (Mbps)</label>` +
+      `  <input id="swal-limit" type="number" class="swal2-input" value="50" style="margin: 0; width: 100%; height: 36px; background: var(--panel-2); color: var(--txt); border: 1px solid var(--brd); border-radius: 6px; padding: 0 10px; font-size: 0.85rem; font-family: inherit;">` +
+      `</div>` +
+      `<div style="text-align: left;">` +
+      `  <label style="display: block; font-size: 0.75rem; color: var(--txt-m); margin-bottom: 4px; font-weight: 600; text-transform: uppercase;">Rollback (Minutes)</label>` +
+      `  <input id="swal-rollback" type="number" class="swal2-input" value="0" placeholder="0 for manual removal" style="margin: 0; width: 100%; height: 36px; background: var(--panel-2); color: var(--txt); border: 1px solid var(--brd); border-radius: 6px; padding: 0 10px; font-size: 0.85rem; font-family: inherit;">` +
+      `</div>`,
+    focusConfirm: false,
+    showCancelButton: true,
+    confirmButtonText: 'Apply Limit',
+    cancelButtonText: 'Cancel',
+    background: themeColor('--card'),
+    color: themeColor('--txt'),
+    confirmButtonColor: '#f59e0b',
+    cancelButtonColor: '#3a3f58',
+    preConfirm: () => {
+      const limitVal = parseFloat(document.getElementById('swal-limit').value);
+      const rollbackVal = parseInt(document.getElementById('swal-rollback').value || '0');
+      if (isNaN(limitVal) || limitVal <= 0 || limitVal > 10000) {
+        Swal.showValidationMessage('Please enter a valid limit (1-10000 Mbps)');
+        return false;
+      }
+      if (isNaN(rollbackVal) || rollbackVal < 0) {
+        Swal.showValidationMessage('Please enter a valid rollback duration');
+        return false;
+      }
+      return { limit_mbps: limitVal, rollback_min: rollbackVal };
+    }
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      const { limit_mbps, rollback_min } = result.value;
+      try {
+        const r = await fetch(`/api/ratelimit/${encodeURIComponent(d)}/${encodeURIComponent(i)}`, {
+          method: 'POST',
+          headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ limit_mbps, rollback_min })
+        });
+        const j = await r.json();
+        if (j.success) {
+          RemediationManager.start(d, i, 'limit', 'Applying Rate Limit...', `Applying rate limit on interface <b>${i}</b> on <b>${d}</b>.`);
+        } else {
+          showToast('Failed: ' + j.message, true);
+        }
+      } catch(e) {
+        showToast('Error: ' + e, true);
+      }
+    }
+  });
+}
+
+async function removeLimit(d, i) {
+  Swal.fire({
+    title: 'Confirm Unlimit',
+    text: `Remove rate limit on ${d} - ${i}?`,
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, remove',
+    cancelButtonText: 'Cancel',
+    background: themeColor('--card'),
+    color: themeColor('--txt'),
+    confirmButtonColor: '#6366f1',
+    cancelButtonColor: '#3a3f58',
+  }).then(async (result) => {
+    if (result.isConfirmed) {
+      try {
+        const r = await fetch(`/api/removelimit/${encodeURIComponent(d)}/${encodeURIComponent(i)}`, {method:'POST',headers:csrfHeaders()});
+        const j = await r.json();
+        if (j.success) {
+          RemediationManager.start(d, i, 'removelimit', 'Removing Rate Limit...', `Removing rate limit on interface <b>${i}</b> on <b>${d}</b>.`);
+        } else {
+          showToast('Failed: ' + j.message, true);
+        }
+      } catch(e) {
+        showToast('Error: ' + e, true);
+      }
+    }
+  });
+}
+
+// ── Live Refresh Loop ──
+let activeId = null, activeType = null;
+let isFirstLoad = true;
+
+// Helper to save all node positions to localStorage
+function saveAllPositions() {
+  const positions = {};
+  cy.nodes().forEach(n => {
+    const pos = n.position();
+    if (pos && (pos.x !== 0 || pos.y !== 0)) {
+      positions[n.id()] = { x: pos.x, y: pos.y };
+    }
+  });
+  if (Object.keys(positions).length > 0) {
+    localStorage.setItem('topology_positions', JSON.stringify(positions));
+  }
+}
+
+// Helper to reset the custom positions and trigger auto-arrange
+function resetLayout() {
+  Swal.fire({
+    title: 'Reset Positions?',
+    text: 'Do you want to clear custom positions and automatically arrange the routers in a circle?',
+    icon: 'question',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, arrange',
+    cancelButtonText: 'Cancel',
+    background: themeColor('--card'),
+    color: themeColor('--txt'),
+    confirmButtonColor: '#6366f1',
+    cancelButtonColor: '#3a3f58',
+  }).then((result) => {
+    if (result.isConfirmed) {
+      localStorage.removeItem('topology_positions');
+      fetchTopology(true); // force layout recalculation
+      showToast('Layout rearranged successfully');
+    }
+  });
+}
+
+// Listen to node 'free' event (released after dragging) to save positions
+cy.on('free', 'node', function() {
+  saveAllPositions();
+});
+
+async function fetchTopology(forceLayout = false) {
+  try {
+    const r = await fetch('/api/topology');
+    if (r.status === 401) { window.location = '/login'; return; }
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message);
+    
+    // Save selected element ID to maintain selection on redraw
+    const selected = cy.$(':selected');
+    activeId = selected.length ? selected.id() : null;
+    activeType = selected.length ? (selected.isNode() ? 'node' : 'edge') : null;
+
+    // Load saved positions from localStorage
+    const saved = localStorage.getItem('topology_positions');
+    const savedPositions = saved ? JSON.parse(saved) : {};
+
+    // Convert API nodes/edges to Cytoscape formats
+    const elements = [];
+    let needsLayout = forceLayout || Object.keys(savedPositions).length === 0;
+
+    d.nodes.forEach(n => {
+      const nodeEl = { group: 'nodes', data: n };
+      if (savedPositions[n.id] && !forceLayout) {
+        nodeEl.position = savedPositions[n.id];
+      } else {
+        needsLayout = true;
+      }
+      elements.push(nodeEl);
+    });
+    d.edges.forEach(e => {
+      elements.push({ group: 'edges', data: e });
+    });
+
+    // Load elements into Cytoscape
+    cy.json({ elements: elements });
+    
+    if (needsLayout) {
+      // Re-layout (circular grid) if forceLayout is true or some nodes don't have positions saved
+      const layout = cy.layout({
+        name: 'circle',
+        radius: 120,
+        fit: true,
+        padding: 50
+      });
+      layout.on('layoutstop', function() {
+        saveAllPositions();
+        if (isFirstLoad) {
+          cy.fit(null, 50);
+          isFirstLoad = false;
+        }
+      });
+      layout.run();
+    } else if (isFirstLoad) {
+      cy.fit(null, 50);
+      isFirstLoad = false;
+    }
+
+    // Maintain selection and panel state if active element still exists
+    if (activeId) {
+      const el = cy.getElementById(activeId);
+      if (el.length) {
+        el.select();
+        if (activeType === 'node') showNodeDetails(el.data());
+        else showEdgeDetails(el.data());
+      } else {
+        closePanel();
+      }
+    }
+
+    document.getElementById('last-update').textContent = 'Updated: ' + new Date().toLocaleTimeString('th-TH');
+  } catch(e) {
+    document.getElementById('last-update').textContent = 'Error refreshing';
+    showToast('Failed to sync network map: ' + e.message, true);
+  }
+}
+
+// SocketIO Live Event Listeners for Instant Refresh
+const socket = io();
+socket.on('anomaly', () => { fetchTopology(); });
+socket.on('device_down', () => { fetchTopology(); });
+socket.on('remediation_result', d => {
+  if (d.success) {
+    setTimeout(fetchTopology, 2000);
+    setTimeout(fetchTopology, 6000);
+  }
+});
+
+// Run Initial Load and Periodical Loop (Every 10 seconds)
+fetchTopology();
+setInterval(fetchTopology, 10000);
+</script>
+</body>
+</html>

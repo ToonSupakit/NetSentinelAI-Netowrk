@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>NetSentinel AI — System Logs</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="/static/theme.css" rel="stylesheet">
+<script src="/static/theme.js"></script>
+<link href="/static/sidebar.css" rel="stylesheet">
+<style>
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);display:flex;min-height:100vh}
+.main{flex:1;padding:2.25rem;min-width:0;display:flex;flex-direction:column;gap:1.5rem}
+.header{display:flex;justify-content:space-between;align-items:center}
+.header h2{font-size:1.25rem;font-weight:700}
+.grid-layout {display:grid;grid-template-columns:2fr 1fr;gap:1.5rem;align-items:start}
+.card{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:1.5rem;box-shadow:var(--shadow-sm);transition:all 0.3s ease}
+.card h3{font-size:1rem;font-weight:700;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.6rem}
+.tools{display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1.25rem}
+.select, .input{background:var(--panel-2);border:1px solid var(--brd);color:var(--txt);border-radius:8px;font-family:inherit;font-size:0.82rem;height:38px;padding:0 0.75rem;transition:all 0.2s}
+.select:focus, .input:focus{outline:none;border-color:var(--ac);box-shadow:var(--focus)}
+.input{flex:1;min-width:180px}
+.btn{background:var(--ac);color:#fff;border:none;padding:0 1.25rem;border-radius:8px;font-weight:600;font-size:0.82rem;height:38px;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:0.5rem;font-family:inherit}
+.btn:hover{background:var(--ac-h)}
+.btn-secondary {background:var(--panel-2);color:var(--txt);border:1px solid var(--brd)}
+.btn-secondary:hover {background:var(--brd-soft)}
+
+/* Table Styling */
+.table-wrap{overflow-x:auto;border:1px solid var(--brd-soft);border-radius:8px;background:var(--panel-2)}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:0.82rem}
+th{text-align:left;padding:0.75rem 1rem;color:var(--txt-m);font-weight:600;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--brd)}
+td{padding:0.75rem 1rem;border-bottom:1px solid var(--brd-soft);vertical-align:middle;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--card)}
+
+/* Badges for severity */
+.badge {padding:0.2rem 0.5rem;border-radius:5px;font-size:0.68rem;font-weight:600;text-transform:uppercase}
+.badge-emergency, .badge-alert, .badge-critical, .badge-error{background:var(--err-bg);color:var(--err);border:1px solid rgba(239,68,68,0.2)}
+.badge-warning{background:var(--wrn-bg);color:var(--wrn);border:1px solid rgba(245,158,11,0.2)}
+.badge-notice, .badge-informational, .badge-info{background:var(--ok-bg);color:var(--ok);border:1px solid rgba(16,185,129,0.2)}
+.badge-debug{background:var(--panel-2);color:var(--txt-m);border:1px solid var(--brd)}
+
+/* Sandbox Area */
+.sandbox-textarea{width:100%;background:var(--panel-2);border:1px solid var(--brd);color:var(--txt);border-radius:8px;padding:0.75rem;font-family:monospace;font-size:0.8rem;resize:vertical;min-height:100px;margin-bottom:0.75rem;transition:all 0.2s}
+.sandbox-textarea:focus{outline:none;border-color:var(--ac);box-shadow:var(--focus)}
+
+/* Modal Viewer */
+.modal-overlay {position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;display:none;align-items:center;justify-content:center;padding:2rem;animation:fadeIn 0.25s ease}
+.modal-container {background:var(--card);border:1px solid var(--brd);border-radius:12px;width:100%;max-width:650px;box-shadow:var(--shadow);overflow:hidden;animation:slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)}
+.modal-header {padding:1.25rem 1.5rem;border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center}
+.modal-title {font-weight:700;font-size:1.05rem}
+.modal-close {background:none;border:none;color:var(--txt-m);cursor:pointer;padding:4px;border-radius:50%;display:grid;place-items:center;transition:all 0.2s}
+.modal-close:hover {background:var(--panel-2);color:var(--txt)}
+.modal-body {padding:1.5rem;display:flex;flex-direction:column;gap:1.25rem}
+.modal-field {background:var(--panel-2);border:1px solid var(--brd-soft);border-radius:8px;padding:1rem}
+.modal-field-title {font-size:0.72rem;font-weight:700;text-transform:uppercase;color:var(--txt-m);margin-bottom:0.45rem;letter-spacing:0.04em}
+.modal-field-content {font-size:0.85rem;line-height:1.5;white-space:pre-wrap}
+
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes slideUp { from{transform:translateY(20px)} to{transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+{% include 'sidebar.html' %}
+
+<div class="main">
+  <div class="header">
+    <h2>System Logs</h2>
+  </div>
+
+  <div class="grid-layout">
+    <!-- Real-time Flowing Syslogs -->
+    <div class="card" style="margin-bottom: 0;">
+      <h3>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ac)" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        Live Device Syslogs
+      </h3>
+      <div class="tools">
+        <select class="select" id="filter-device" onchange="fetchSyslogs()">
+          <option value="all">All devices</option>
+        </select>
+        <select class="select" id="filter-severity" onchange="fetchSyslogs()">
+          <option value="all">All Severities</option>
+          <option value="Emergency">Emergency</option>
+          <option value="Alert">Alert</option>
+          <option value="Critical">Critical</option>
+          <option value="Error">Error</option>
+          <option value="Warning">Warning</option>
+          <option value="Notice">Notice</option>
+          <option value="Informational">Informational</option>
+          <option value="Debug">Debug</option>
+        </select>
+        <input type="text" class="input" id="search-log" placeholder="Search logs (e.g. OSPF, changed state)..." oninput="fetchSyslogs()">
+        <button class="btn btn-secondary" onclick="clearFilters()">Reset</button>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Device</th>
+              <th>Severity</th>
+              <th>Mnemonic</th>
+              <th>Message</th>
+              <th>AI Analysis</th>
+            </tr>
+          </thead>
+          <tbody id="logs-tbody">
+            <tr>
+              <td colspan="6" style="text-align: center; color: var(--txt-m); padding: 2rem;">Loading logs...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- On-Demand AI Sandbox Analyzer -->
+    <div class="card">
+      <h3>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--wrn)" stroke-width="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        AI Sandbox Analyzer
+      </h3>
+      <p style="font-size: 0.76rem; color: var(--txt-m); margin-bottom: 0.85rem; line-height: 1.45;">Paste any raw network syslog or CLI output below, and let the NetSentinel AI analyze and explain its root cause and recommended actions.</p>
+      <textarea class="sandbox-textarea" id="sandbox-input" placeholder="Paste syslog here... (e.g., %OSPF-5-ADJCHG: Process 1, Nbr 192.168.1.1 on GigabitEthernet0/1 from FULL to DOWN, Neighbor Down: Dead timer expired)"></textarea>
+      <button class="btn" style="width: 100%;" onclick="runSandboxAnalysis()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Analyze Log
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- AI Insight Details Modal -->
+<div class="modal-overlay" id="insight-modal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <span class="modal-title" id="insight-modal-title">AI Log Diagnostics</span>
+      <button class="modal-close" onclick="closeModal('insight-modal')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field">
+        <div class="modal-field-title">Original Log Entry</div>
+        <div class="modal-field-content" id="insight-log-entry" style="font-family: monospace; font-size: 0.78rem;"></div>
+      </div>
+      <div class="modal-field" style="border-left: 4px solid var(--ac);">
+        <div class="modal-field-title">AI Root Cause Analysis (สาเหตุหลัก)</div>
+        <div class="modal-field-content" id="insight-ai-cause"></div>
+      </div>
+      <div class="modal-field" style="border-left: 4px solid var(--ok);">
+        <div class="modal-field-title">AI Recommended Troubleshooting (คำแนะนำแก้ไข)</div>
+        <div class="modal-field-content" id="insight-ai-suggestion"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function csrfHeaders(extra={}){return {'X-CSRF-Token':document.querySelector('meta[name="csrf-token"]').content,...extra}}
+const socket = io();
+
+// Fetch devices list for filter dropdown
+async function loadDevicesFilter() {
+  try {
+    const r = await fetch('/api/settings/devices');
+    const d = await r.json();
+    if (d.success) {
+      const select = document.getElementById('filter-device');
+      const devs = d.data.devices || [];
+      devs.forEach(dev => {
+        const opt = document.createElement('option');
+        opt.value = dev.name;
+        opt.textContent = dev.name;
+        select.appendChild(opt);
+      });
+    }
+  } catch(e) {
+    console.warn("Failed to load device filters", e);
+  }
+}
+
+// Fetch historical syslogs with filter parameters
+async function fetchSyslogs() {
+  const device = document.getElementById('filter-device').value;
+  const severity = document.getElementById('filter-severity').value;
+  const search = document.getElementById('search-log').value;
+
+  try {
+    const r = await fetch(`/api/syslogs?device=${encodeURIComponent(device)}&severity=${encodeURIComponent(severity)}&search=${encodeURIComponent(search)}`);
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message);
+    
+    renderLogsTable(d.logs);
+  } catch(e) {
+    const tbody = document.getElementById('logs-tbody');
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--err); padding: 2rem;">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function renderLogsTable(logs) {
+  const tbody = document.getElementById('logs-tbody');
+  tbody.innerHTML = '';
+  
+  if (logs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--txt-m); padding: 2rem;">No logs found matching filters.</td></tr>';
+    return;
+  }
+
+  logs.forEach(log => {
+    const tr = document.createElement('tr');
+    
+    const tdTime = document.createElement('td');
+    tdTime.textContent = log.received_at;
+    tdTime.style.color = 'var(--txt-m)';
+    
+    const tdDevice = document.createElement('td');
+    tdDevice.textContent = log.device_name;
+    tdDevice.style.fontWeight = '700';
+    
+    const tdSeverity = document.createElement('td');
+    const sevClass = `badge badge-${log.severity.toLowerCase()}`;
+    tdSeverity.innerHTML = `<span class="${sevClass}">${log.severity}</span>`;
+    
+    const tdMnem = document.createElement('td');
+    tdMnem.style.fontFamily = 'monospace';
+    tdMnem.innerHTML = `<span style="color:var(--ac); font-weight:600;">%${log.facility}-${log.mnemonic}</span>`;
+    
+    const tdMsg = document.createElement('td');
+    tdMsg.textContent = log.message;
+    tdMsg.style.maxWidth = '250px';
+    tdMsg.style.overflow = 'hidden';
+    tdMsg.style.textOverflow = 'ellipsis';
+    
+    const tdAction = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary btn-sm';
+    btn.style.cssText = 'height: 28px; padding: 0 0.65rem; font-size: 0.72rem;';
+    btn.textContent = 'AI Insights';
+    btn.onclick = () => showInsightModal(log);
+    tdAction.appendChild(btn);
+
+    tr.appendChild(tdTime);
+    tr.appendChild(tdDevice);
+    tr.appendChild(tdSeverity);
+    tr.appendChild(tdMnem);
+    tr.appendChild(tdMsg);
+    tr.appendChild(tdAction);
+    
+    tbody.appendChild(tr);
+  });
+}
+
+function clearFilters() {
+  document.getElementById('filter-device').value = 'all';
+  document.getElementById('filter-severity').value = 'all';
+  document.getElementById('search-log').value = '';
+  fetchSyslogs();
+}
+
+function showInsightModal(logEntry) {
+  document.getElementById('insight-modal-title').textContent = `${logEntry.device_name} — Log Diagnostics`;
+  document.getElementById('insight-log-entry').textContent = `%${logEntry.facility}-${logEntry.severity.toUpperCase()}-${logEntry.mnemonic}: ${logEntry.message}`;
+  document.getElementById('insight-ai-cause').textContent = logEntry.ai_cause || "ไม่พบสาเหตุผิดปกติพิเศษ";
+  document.getElementById('insight-ai-suggestion').textContent = logEntry.ai_suggestion || "ตรวจสอบสภาพการเชื่อมต่อปกติ";
+  showModal('insight-modal');
+}
+
+// On-demand AI Sandbox analysis
+async function runSandboxAnalysis() {
+  const textInput = document.getElementById('sandbox-input').value.trim();
+  if (!textInput) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'Empty Input',
+      text: 'Please paste a syslog message to analyze!',
+      background: themeColor('--card'),
+      color: themeColor('--txt'),
+      confirmButtonColor: '#6366f1'
+    });
+    return;
+  }
+
+  Swal.fire({
+    title: 'AI Analyzing...',
+    text: 'Please wait, parsing CLI output...',
+    allowOutsideClick: false,
+    background: themeColor('--card'),
+    color: themeColor('--txt'),
+    didOpen: () => {
+      Swal.showLoading();
+    }
+  });
+
+  try {
+    const r = await fetch('/api/syslogs/analyze', {
+      method: 'POST',
+      headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ log_text: textInput })
+    });
+    const d = await r.json();
+    Swal.close();
+    
+    if (d.success) {
+      showInsightModal({
+        device_name: "Sandbox",
+        facility: d.facility,
+        severity: "Info",
+        mnemonic: d.mnemonic,
+        message: d.message,
+        ai_cause: d.ai_cause,
+        ai_suggestion: d.ai_suggestion
+      });
+    } else {
+      throw new Error(d.message);
+    }
+  } catch(e) {
+    Swal.close();
+    Swal.fire({
+      icon: 'error',
+      title: 'Analysis Failed',
+      text: e.message,
+      background: themeColor('--card'),
+      color: themeColor('--txt'),
+      confirmButtonColor: '#ef4444'
+    });
+  }
+}
+
+function showModal(id) {
+  document.getElementById(id).style.display = 'flex';
+}
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+// Real-time Socket.IO streaming event listener
+socket.on('syslog_received', (logData) => {
+  const currentDevice = document.getElementById('filter-device').value;
+  const currentSeverity = document.getElementById('filter-severity').value;
+  
+  // Verify if streaming log matches currently selected filters before injecting
+  if (currentDevice !== 'all' && logData.device_name !== currentDevice) return;
+  if (currentSeverity !== 'all' && logData.severity !== currentSeverity) return;
+  
+  const tbody = document.getElementById('logs-tbody');
+  
+  // Remove placeholder row if any
+  if (tbody.children.length === 1 && tbody.children[0].cells.length === 1) {
+    tbody.innerHTML = '';
+  }
+
+  const tr = document.createElement('tr');
+  tr.style.animation = 'fadeIn 0.4s ease';
+  
+  const tdTime = document.createElement('td');
+  tdTime.textContent = logData.received_at;
+  tdTime.style.color = 'var(--txt-m)';
+  
+  const tdDevice = document.createElement('td');
+  tdDevice.textContent = logData.device_name;
+  tdDevice.style.fontWeight = '700';
+  
+  const tdSeverity = document.createElement('td');
+  const sevClass = `badge badge-${logData.severity.toLowerCase()}`;
+  tdSeverity.innerHTML = `<span class="${sevClass}">${logData.severity}</span>`;
+  
+  const tdMnem = document.createElement('td');
+  tdMnem.style.fontFamily = 'monospace';
+  tdMnem.innerHTML = `<span style="color:var(--ac); font-weight:600;">%${logData.facility}-${logData.mnemonic}</span>`;
+  
+  const tdMsg = document.createElement('td');
+  tdMsg.textContent = logData.message;
+  tdMsg.style.maxWidth = '250px';
+  tdMsg.style.overflow = 'hidden';
+  tdMsg.style.textOverflow = 'ellipsis';
+  
+  const tdAction = document.createElement('td');
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-secondary btn-sm';
+  btn.style.cssText = 'height: 28px; padding: 0 0.65rem; font-size: 0.72rem;';
+  btn.textContent = 'AI Insights';
+  btn.onclick = () => showInsightModal(logData);
+  tdAction.appendChild(btn);
+
+  tr.appendChild(tdTime);
+  tr.appendChild(tdDevice);
+  tr.appendChild(tdSeverity);
+  tr.appendChild(tdMnem);
+  tr.appendChild(tdMsg);
+  tr.appendChild(tdAction);
+
+  tbody.insertBefore(tr, tbody.firstChild);
+  
+  // Cap visible table rows to 100 to protect browser memory
+  if (tbody.children.length > 100) {
+    tbody.lastChild.remove();
+  }
+});
+
+// Setup on DOM Load
+document.addEventListener('DOMContentLoaded', () => {
+  loadDevicesFilter();
+  fetchSyslogs();
+});
+</script>
+</body>
+</html>

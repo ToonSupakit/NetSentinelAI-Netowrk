@@ -11,6 +11,9 @@ ENV_KEYS = frozenset(
         "DEVICE_PASSWORD",
         "DEVICE_SECRET",
         "SNMP_COMMUNITY",
+        "SNMP_V3_USER",
+        "SNMP_V3_AUTH",
+        "SNMP_V3_PRIV",
     }
 )
 ENV_SECRET_KEYS = frozenset(
@@ -19,6 +22,8 @@ ENV_SECRET_KEYS = frozenset(
         "DEVICE_PASSWORD",
         "DEVICE_SECRET",
         "SNMP_COMMUNITY",
+        "SNMP_V3_AUTH",
+        "SNMP_V3_PRIV",
     }
 )
 

@@ -14,6 +14,7 @@ from app.predictor import predict_all, reload_model
 from app.bot import run_bot, anomaly_queue, client, send_timeout_alert
 from app.runtime import shutdown_event, request_shutdown, collect_now_event
 from web.dashboard import run_dashboard, push_anomaly, push_device_down
+from app.syslog_server import syslog_server_instance
 
 load_dotenv()
 
@@ -122,7 +123,7 @@ def collect_and_predict():
                     )
                 log.info("Reported %s anomaly row(s)", len(anomalies))
             else:
-                log.info("✅ All interfaces OK (Rules ✓ AI ✓)")
+                log.info("All interfaces OK (Rules OK, AI OK)")
 
             cleanup_counter += 1
             if cleanup_counter * INTERVAL >= 3600:
@@ -159,6 +160,7 @@ def signal_handler(sig, frame):
     log.info("Received %s — shutting down...", signame)
     request_shutdown()
     _stop_discord_gracefully()
+    syslog_server_instance.stop()
 
 
 if __name__ == "__main__":
@@ -170,6 +172,7 @@ if __name__ == "__main__":
     print("=" * 50)
 
     init_db()
+    syslog_server_instance.start()
 
     t_collect = threading.Thread(target=collect_and_predict, name="collect_predict", daemon=True)
     t_collect.start()
@@ -197,6 +200,7 @@ if __name__ == "__main__":
             request_shutdown()
 
     request_shutdown()
+    syslog_server_instance.stop()
     log.info("Waiting for collector thread (max 90s)...")
     t_collect.join(timeout=90)
     if t_collect.is_alive():

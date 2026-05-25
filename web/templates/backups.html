@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>NetSentinel AI — Config Backups</title>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="/static/theme.css" rel="stylesheet">
+<script src="/static/theme.js"></script>
+<link href="/static/sidebar.css" rel="stylesheet">
+<style>
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);min-height:100vh;display:flex}
+.main{flex:1;padding:2.25rem;min-width:0;display:flex;flex-direction:column}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-shrink:0}
+.header h2{font-size:1.25rem;font-weight:700}
+.card{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:1.5rem;margin-bottom:1.5rem;box-shadow:var(--shadow-sm)}
+.card h3{font-size:1rem;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.5rem}
+
+/* Backup Progress Card */
+.progress-card {
+  border-color: var(--ac);
+  background: rgba(var(--card-rgb, 20, 20, 25), 0.95);
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: var(--panel-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+  border: 1px solid var(--brd-soft);
+}
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--ac);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.log-box {
+  background: var(--panel-2);
+  border: 1px solid var(--brd);
+  border-radius: 8px;
+  padding: 1rem;
+  height: 200px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  color: var(--soft);
+  line-height: 1.5;
+}
+
+/* Sessions Grid & Table */
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:.82rem}
+th{text-align:left;padding:.75rem .65rem;color:var(--txt-m);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--brd)}
+td{padding:.75rem .65rem;border-bottom:1px solid var(--brd-soft)}
+tr:last-child td{border-bottom:none}
+
+.btn{background:var(--ac);color:#fff;border:none;padding:.55rem 1.1rem;border-radius:8px;font-weight:600;font-size:.82rem;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:.4rem;font-family:inherit}
+.btn:hover{background:var(--ac-h)}
+.btn-secondary {
+  background: var(--panel-2);
+  color: var(--txt);
+  border: 1px solid var(--brd);
+}
+.btn-secondary:hover {
+  background: var(--brd-soft);
+}
+.btn-sm {
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+  border-radius: 6px;
+}
+
+/* Modal Viewers */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  z-index: 2000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  animation: fadeIn 0.25s ease;
+}
+.modal-container {
+  background: var(--card);
+  border: 1px solid var(--brd);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 900px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--brd);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--txt-m);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  transition: background 0.2s, color 0.2s;
+}
+.modal-close:hover {
+  background: var(--panel-2);
+  color: var(--txt);
+}
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Monospace Viewer */
+.code-viewer {
+  background: var(--panel-2);
+  border: 1px solid var(--brd-soft);
+  border-radius: 8px;
+  padding: 1rem;
+  font-family: monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-x: auto;
+  color: var(--txt);
+}
+
+/* Diff Viewer Table */
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.diff-row {
+  border-bottom: none;
+}
+.diff-row td {
+  padding: 0.15rem 0.4rem;
+  border-bottom: none;
+}
+.diff-num {
+  width: 40px;
+  text-align: right;
+  color: var(--txt-m);
+  user-select: none;
+  border-right: 1px solid var(--brd-soft);
+  opacity: 0.6;
+}
+.diff-sign {
+  width: 20px;
+  text-align: center;
+  user-select: none;
+  font-weight: bold;
+}
+.diff-code {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Diff Colors */
+.diff-row-add {
+  background: rgba(16, 185, 129, 0.08);
+  color: #34d399;
+}
+.diff-row-add .diff-sign { color: #10b981; }
+.diff-row-delete {
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+}
+.diff-row-delete .diff-sign { color: #ef4444; }
+.diff-row-normal {
+  background: transparent;
+  color: var(--txt);
+}
+
+/* Interactive Badge Roles */
+.badge {
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+}
+.badge-up { background: var(--ok-bg); color: var(--ok); border: 1px solid rgba(16,185,129,0.15); }
+.badge-normal { background: var(--ac-bg); color: var(--ac); border: 1px solid rgba(99,102,241,0.15); }
+.badge-anomaly { background: var(--err-bg); color: var(--err); border: 1px solid rgba(239,68,68,0.15); }
+
+/* SweetAlert2 dropdown and options styling for dark theme */
+body .swal2-container .swal2-popup select.swal2-select {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 6px !important;
+  padding: 0.5rem !important;
+  font-size: 0.85rem !important;
+}
+
+body .swal2-container .swal2-popup select.swal2-select option {
+  color-scheme: light !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+</head>
+<body>
+
+{% include 'sidebar.html' %}
+
+<div class="main">
+  <div class="header">
+    <h2>Configuration Backups</h2>
+    <button class="btn" id="backup-btn" onclick="startBackup()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      Backup Now
+    </button>
+  </div>
+
+  <!-- Backup Live Progress Log Card -->
+  <div class="card progress-card" id="progress-card">
+    <h3 style="margin-bottom: 0.5rem;">
+      <svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 4px; display: inline; animation: spin 1s linear infinite;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+      Running Configuration Backup...
+    </h3>
+    <p style="color: var(--txt-m); font-size: 0.8rem; margin-bottom: 0.75rem;" id="progress-status">Initializing connections...</p>
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="log-box" id="log-box"></div>
+  </div>
+
+  <!-- Sessions List Table -->
+  <div class="card">
+    <h3>Backup Sessions History</h3>
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Session / Timestamp</th>
+            <th>Devices Saved</th>
+            <th>Total Size</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="sessions-tbody">
+          <!-- Dynamically filled -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Expanded Session Details Box -->
+  <div class="card" id="session-details-card" style="display: none; animation: fadeIn 0.3s ease;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+      <h3 id="session-details-title">Backup Session Details</h3>
+      <button class="btn btn-secondary btn-sm" onclick="closeSessionDetails()">Close Details</button>
+    </div>
+    <div style="overflow-x: auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>Device Name</th>
+            <th>File Type</th>
+            <th>Filename</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="files-tbody">
+          <!-- Dynamically filled -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Code Viewer Modal -->
+<div class="modal-overlay" id="code-modal">
+  <div class="modal-container">
+    <div class="modal-header">
+      <span class="modal-title" id="code-modal-title">View Config</span>
+      <button class="modal-close" onclick="closeModal('code-modal')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="code-viewer" id="code-viewer-box"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Git Diff Viewer Modal -->
+<div class="modal-overlay" id="diff-modal">
+  <div class="modal-container" style="max-width: 1000px;">
+    <div class="modal-header">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <span class="modal-title" id="diff-modal-title">Git-style Config Diff Comparison</span>
+        <span style="font-size: 0.72rem; color: var(--txt-m);" id="diff-modal-subtitle">Comparing files...</span>
+      </div>
+      <button class="modal-close" onclick="closeModal('diff-modal')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="modal-body" style="padding: 1rem 1.5rem;">
+      <div style="background: var(--panel-2); border: 1px solid var(--brd); border-radius: 8px; overflow: hidden;">
+        <div style="overflow-x: auto;">
+          <table class="diff-table">
+            <tbody id="diff-tbody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function csrfHeaders(extra={}){return {'X-CSRF-Token':document.querySelector('meta[name="csrf-token"]').content,...extra}}
+const Toast = Swal.mixin({
+  toast: true,
+  position: 'bottom-end',
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+  background: themeColor('--card'),
+  color: themeColor('--txt'),
+  didOpen: (toast) => {
+    toast.addEventListener('mouseenter', Swal.stopTimer)
+    toast.addEventListener('mouseleave', Swal.resumeTimer)
+  }
+});
+function showToast(m,err=false){
+  Toast.fire({ icon: err ? 'error' : 'success', title: m });
+}
+
+let activeSessionId = null;
+let allSessions = [];
+
+async function loadSessions() {
+  try {
+    const r = await fetch('/api/backups/sessions');
+    if (r.status === 401) { window.location = '/login'; return; }
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message);
+    
+    allSessions = d.sessions;
+    renderSessions();
+  } catch(e) {
+    showToast('Failed to load backup sessions: ' + e.message, true);
+  }
+}
+
+function renderSessions() {
+  const tbody = document.getElementById('sessions-tbody');
+  tbody.innerHTML = '';
+  if (allSessions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--txt-m); padding: 2rem;">No backup sessions found. Click "Backup Now" to trigger your first backup!</td></tr>';
+    return;
+  }
+  
+  allSessions.forEach(s => {
+    const tr = document.createElement('tr');
+    
+    // Timestamp name
+    const tdTime = document.createElement('td');
+    tdTime.style.fontWeight = '600';
+    tdTime.textContent = formatTimestamp(s.timestamp);
+    
+    // Device list
+    const tdDevices = document.createElement('td');
+    tdDevices.textContent = s.devices.join(', ') || 'None';
+    
+    // Total size
+    const tdSize = document.createElement('td');
+    tdSize.textContent = formatBytes(s.size_bytes);
+    
+    // Status
+    const tdStatus = document.createElement('td');
+    tdStatus.innerHTML = s.device_count > 0 ? '<span class="badge badge-up">Success</span>' : '<span class="badge badge-anomaly">Failed</span>';
+    
+    // Actions
+    const tdActions = document.createElement('td');
+    
+    const viewBtn = document.createElement('button');
+    viewBtn.className = 'btn btn-secondary btn-sm';
+    viewBtn.textContent = 'View Session';
+    viewBtn.onclick = () => showSessionDetails(s.id);
+    
+    tdActions.appendChild(viewBtn);
+    
+    tr.appendChild(tdTime);
+    tr.appendChild(tdDevices);
+    tr.appendChild(tdSize);
+    tr.appendChild(tdStatus);
+    tr.appendChild(tdActions);
+    tbody.appendChild(tr);
+  });
+}
+
+async function showSessionDetails(sessionId) {
+  try {
+    const r = await fetch(`/api/backups/session/${sessionId}`);
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message);
+    
+    activeSessionId = sessionId;
+    document.getElementById('session-details-title').textContent = `Backup Session: ${formatTimestamp(sessionId)}`;
+    
+    const tbody = document.getElementById('files-tbody');
+    tbody.innerHTML = '';
+    
+    // Map configs & routes
+    const files = [...d.configs, ...d.routes];
+    
+    files.forEach(f => {
+      const tr = document.createElement('tr');
+      
+      const tdName = document.createElement('td');
+      tdName.style.fontWeight = '600';
+      tdName.textContent = f.name;
+      
+      const tdType = document.createElement('td');
+      tdType.innerHTML = f.type === 'config' ? '<span class="badge badge-normal">Running Config</span>' : '<span class="badge badge-up">Routing Table</span>';
+      
+      const tdFilename = document.createElement('td');
+      tdFilename.style.fontFamily = 'monospace';
+      tdFilename.textContent = f.filename;
+      
+      const tdActions = document.createElement('td');
+      
+      const readBtn = document.createElement('button');
+      readBtn.className = 'btn btn-secondary btn-sm';
+      readBtn.style.marginRight = '0.5rem';
+      readBtn.textContent = 'View';
+      readBtn.onclick = () => viewFile(sessionId, f.filename);
+      
+      const compareBtn = document.createElement('button');
+      compareBtn.className = 'btn btn-sm';
+      compareBtn.style.cssText = 'background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.2);';
+      compareBtn.textContent = 'Compare (Diff)';
+      compareBtn.onclick = () => selectSessionToCompare(sessionId, f.name, f.filename);
+      
+      tdActions.appendChild(readBtn);
+      tdActions.appendChild(compareBtn);
+      
+      tr.appendChild(tdName);
+      tr.appendChild(tdType);
+      tr.appendChild(tdFilename);
+      tr.appendChild(tdActions);
+      tbody.appendChild(tr);
+    });
+    
+    document.getElementById('session-details-card').style.display = 'block';
+    document.getElementById('session-details-card').scrollIntoView({ behavior: 'smooth' });
+  } catch(e) {
+    showToast(e.message, true);
+  }
+}
+
+function closeSessionDetails() {
+  document.getElementById('session-details-card').style.display = 'none';
+}
+
+async function viewFile(sessionId, filename) {
+  try {
+    const r = await fetch(`/api/backups/session/${sessionId}/file/${filename}`);
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message);
+    
+    document.getElementById('code-modal-title').textContent = `${filename} (${formatTimestamp(sessionId)})`;
+    document.getElementById('code-viewer-box').textContent = d.content;
+    showModal('code-modal');
+  } catch(e) {
+    showToast(e.message, true);
+  }
+}
+
+function selectSessionToCompare(currentSessionId, deviceName, filename) {
+  // Let the user select another session to compare with
+  const options = {};
+  allSessions.forEach(s => {
+    if (s.id !== currentSessionId && s.devices.includes(deviceName)) {
+      options[s.id] = formatTimestamp(s.id);
+    }
+  });
+  
+  if (Object.keys(options).length === 0) {
+    Swal.fire({
+      title: 'No Other Backups',
+      text: `There are no other historical backup sessions containing "${deviceName}" to compare with! Click "Backup Now" to create another checkpoint.`,
+      icon: 'info',
+      background: themeColor('--card'),
+      color: themeColor('--txt'),
+      confirmButtonColor: '#6366f1'
+    });
+    return;
+  }
+  
+  Swal.fire({
+    title: 'Select Backup Version',
+    text: `Select a version of ${deviceName} config to compare with ${formatTimestamp(currentSessionId)}:`,
+    input: 'select',
+    inputOptions: options,
+    inputPlaceholder: 'Select a version',
+    showCancelButton: true,
+    background: themeColor('--card'),
+    color: themeColor('--txt'),
+    confirmButtonColor: '#6366f1',
+    cancelButtonColor: '#3a3f58',
+    inputValidator: (value) => {
+      return new Promise((resolve) => {
+        if (value) resolve();
+        else resolve('You must select a backup version!');
+      });
+    }
+  }).then((result) => {
+    if (result.isConfirmed) {
+      showDiff(currentSessionId, result.value, filename);
+    }
+  });
+}
+
+async function showDiff(sessionA, sessionB, filename) {
+  try {
+    const r = await fetch(`/api/backups/diff?session_a=${sessionA}&session_b=${sessionB}&filename=${filename}`);
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message);
+    
+    const deviceName = filename.split('_')[0];
+    document.getElementById('diff-modal-title').textContent = `${deviceName} Config comparison`;
+    document.getElementById('diff-modal-subtitle').textContent = `Comparing older version (${formatTimestamp(sessionA)}) with newer version (${formatTimestamp(sessionB)})`;
+    
+    const tbody = document.getElementById('diff-tbody');
+    tbody.innerHTML = '';
+    
+    if (d.diff.length === 0) {
+      tbody.innerHTML = '<tr><td style="text-align: center; color: var(--txt-m); padding: 2rem;">No changes detected. The configurations are identical.</td></tr>';
+    } else {
+      d.diff.forEach(line => {
+        const tr = document.createElement('tr');
+        tr.className = `diff-row diff-row-${line.type}`;
+        
+        const tdNumA = document.createElement('td');
+        tdNumA.className = 'diff-num';
+        tdNumA.textContent = line.line_a || '';
+        
+        const tdNumB = document.createElement('td');
+        tdNumB.className = 'diff-num';
+        tdNumB.textContent = line.line_b || '';
+        
+        const tdSign = document.createElement('td');
+        tdSign.className = 'diff-sign';
+        tdSign.textContent = line.type === 'add' ? '+' : (line.type === 'delete' ? '-' : ' ');
+        
+        const tdCode = document.createElement('td');
+        tdCode.className = 'diff-code';
+        tdCode.textContent = line.text;
+        
+        tr.appendChild(tdNumA);
+        tr.appendChild(tdNumB);
+        tr.appendChild(tdSign);
+        tr.appendChild(tdCode);
+        tbody.appendChild(tr);
+      });
+    }
+    
+    showModal('diff-modal');
+  } catch(e) {
+    showToast(e.message, true);
+  }
+}
+
+// ── Live Backup Progress Polling ──
+let pollInterval = null;
+async function startBackup() {
+  const btn = document.getElementById('backup-btn');
+  btn.disabled = true;
+  
+  try {
+    const r = await fetch('/api/backups/run', { method: 'POST', headers: csrfHeaders() });
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message);
+    
+    showToast('Backup session initiated');
+    document.getElementById('progress-card').style.display = 'block';
+    document.getElementById('progress-card').scrollIntoView({ behavior: 'smooth' });
+    
+    // Clear old logs
+    document.getElementById('log-box').textContent = 'Initializing connection...';
+    
+    // Start Polling
+    pollBackupStatus();
+    pollInterval = setInterval(pollBackupStatus, 1500);
+  } catch(e) {
+    showToast(e.message, true);
+    btn.disabled = false;
+  }
+}
+
+async function pollBackupStatus() {
+  try {
+    const r = await fetch('/api/backups/status');
+    const d = await r.json();
+    if (!d.success) throw new Error(d.message);
+    
+    const state = d.data;
+    document.getElementById('progress-bar').style.width = `${state.progress}%`;
+    document.getElementById('progress-status').textContent = state.status === 'running' 
+      ? `Processing: ${state.current_device || 'Connecting...'} (${state.progress}%)` 
+      : `Session status: ${state.status.toUpperCase()}`;
+      
+    // Write logs
+    const logBox = document.getElementById('log-box');
+    logBox.textContent = state.log.join('\n');
+    logBox.scrollTop = logBox.scrollHeight;
+    
+    if (state.status !== 'running') {
+      clearInterval(pollInterval);
+      document.getElementById('backup-btn').disabled = false;
+      
+      if (state.status === 'success') {
+        showToast('Configuration backup successfully completed!');
+      } else {
+        showToast('Backup failed. Check connection parameters.', true);
+      }
+      
+      // Reload sessions table
+      loadSessions();
+    }
+  } catch(e) {
+    clearInterval(pollInterval);
+    document.getElementById('backup-btn').disabled = false;
+  }
+}
+
+// ── Modal Utilities ──
+function showModal(id) {
+  document.getElementById(id).style.display = 'flex';
+}
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+// ── Formatting Helpers ──
+function formatTimestamp(t) {
+  if (!t || t.length !== 15) return t;
+  // Format: YYYYMMDD_HHMMSS -> YYYY-MM-DD HH:MM:SS
+  const y = t.slice(0, 4), mo = t.slice(4, 6), d = t.slice(6, 8);
+  const h = t.slice(9, 11), mi = t.slice(11, 13), s = t.slice(13, 15);
+  return `${y}-${mo}-${d} ${h}:${mi}:${s}`;
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = 2;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+// Initial Load
+loadSessions();
+</script>
+</body>
+</html>

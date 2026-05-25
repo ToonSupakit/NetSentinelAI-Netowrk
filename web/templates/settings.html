@@ -48,6 +48,93 @@ tr:last-child td{border-bottom:none}
 .t-i.s{background:var(--ok);color:#fff}.t-i.e{background:var(--err);color:#fff}
 @media(max-width:1100px){.model-grid{grid-template-columns:repeat(2,1fr)}.fr{flex-direction:column;gap:0}}
 @media(max-width:700px){.model-grid{grid-template-columns:1fr}.main{padding:1rem}}
+.badge {
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  display: inline-block;
+}
+.badge-up { background: var(--ok-bg); color: var(--ok); border: 1px solid rgba(16,185,129,0.15); }
+.badge-normal { background: var(--ac-bg); color: var(--ac); border: 1px solid rgba(99,102,241,0.15); }
+.badge-anomaly { background: var(--err-bg); color: var(--err); border: 1px solid rgba(239,68,68,0.15); }
+
+/* Beautiful Minimalist Tooltips */
+.info-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  color: var(--txt-m);
+  cursor: pointer;
+  vertical-align: middle;
+  transition: color 0.2s;
+}
+.info-tip:hover {
+  color: var(--ac);
+}
+.info-icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.5px;
+}
+.info-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 135%;
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  background: rgba(var(--card-rgb, 20, 20, 25), 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--brd);
+  color: var(--txt);
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  width: 240px;
+  white-space: normal;
+  box-shadow: var(--shadow);
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.45;
+  text-align: left;
+}
+.info-tip:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+.skip-tag {
+  background: var(--panel-2);
+  border: 1px solid var(--brd);
+  color: var(--txt);
+  padding: 0.35rem 0.65rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s;
+}
+.skip-tag:hover {
+  border-color: var(--err);
+  background: var(--err-bg);
+  color: var(--err);
+}
+.skip-tag-remove {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+}
 </style>
 </head>
 <body>
@@ -70,18 +157,101 @@ tr:last-child td{border-bottom:none}
     <div class="card">
       <h3>Collector & Data</h3>
       <div class="fr">
-        <div class="fg"><label>Interval (seconds)</label><input type="number" id="cfg-interval" class="fc" placeholder="60"></div>
-        <div class="fg"><label>Retention (days)</label><input type="number" id="cfg-retention" class="fc" placeholder="30"></div>
+        <div class="fg">
+          <label>
+            Interval (seconds)
+            <span class="info-tip" data-tip="ช่วงเวลาในการดึงข้อมูลจากอุปกรณ์เครือข่ายทุกๆ X วินาที ยิ่งค่าน้อยจะยิ่งตรวจสอบได้แบบเรียลไทม์มากขึ้น"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <input type="number" id="cfg-interval" class="fc" placeholder="60">
+        </div>
+        <div class="fg">
+          <label>
+            Retention (days)
+            <span class="info-tip" data-tip="ระยะเวลาจัดเก็บข้อมูลสถิติในระบบคลังข้อมูล หลังจากพ้นจำนวนวันที่ระบุ ข้อมูลเก่าจะถูกเคลียร์เพื่อประหยัดพื้นที่"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <input type="number" id="cfg-retention" class="fc" placeholder="30">
+        </div>
       </div>
       <h3>AI Model Thresholds</h3>
       <div class="fr">
-        <div class="fg"><label>Load (0-255)</label><input type="number" id="cfg-th-load" class="fc" placeholder="20"></div>
-        <div class="fg"><label>Reliability (0-255)</label><input type="number" id="cfg-th-rel" class="fc" placeholder="200"></div>
-        <div class="fg"><label>Errors</label><input type="number" id="cfg-th-err" class="fc" placeholder="10"></div>
+        <div class="fg">
+          <label>
+            Load (0-255)
+            <span class="info-tip" data-tip="เกณฑ์ทราฟฟิกสูงสุด (0-255) หากพอร์ตใดมีอัตราส่ง/รับข้อมูลสูงกว่าค่านี้ AI จะประเมินว่ามีโอกาสเป็นความผิดปกติ"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <input type="number" id="cfg-th-load" class="fc" placeholder="20">
+        </div>
+        <div class="fg">
+          <label>
+            Reliability (0-255)
+            <span class="info-tip" data-tip="เกณฑ์ความเสถียรของลิงก์ (0-255) ค่า 255 คือเสถียร 100% หากค่าตกลงมาต่ำกว่าที่ระบุ AI จะถือว่าสายส่งมีปัญหา"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <input type="number" id="cfg-th-rel" class="fc" placeholder="200">
+        </div>
+        <div class="fg">
+          <label>
+            Errors
+            <span class="info-tip" data-tip="เกณฑ์จำนวนแพ็กเก็ตที่เสียหาย (เช่น CRC, Input Errors) หากพบค่าเสียหายต่อรอบสูงกว่านี้ จะเตือนภัยทันที"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <input type="number" id="cfg-th-err" class="fc" placeholder="10">
+        </div>
       </div>
-      <h3>Advanced YAML</h3>
-      <div class="fg"><label>Full config.yaml</label><textarea id="cfg-raw" class="fc" spellcheck="false"></textarea></div>
-      <button class="btn btn-full" onclick="saveConfig()">Save General Settings</button>
+      <!-- Subnet & Link Type Rules -->
+      <h3 style="margin-top: 1.5rem;">Link Type Rules</h3>
+      <p style="color:var(--txt-m);font-size:.78rem;margin-bottom:1rem;margin-top:-0.5rem">กำหนดประเภทเส้นลิงก์ (เช่น Core, LAN, Management) ตามช่วง IP Address ของอินเทอร์เฟส</p>
+      
+      <div style="margin-bottom: 1.25rem; overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Subnet Prefix (เช่น 10.10.)</th>
+              <th>Link Type (เช่น Core)</th>
+              <th style="width: 80px;">Action</th>
+            </tr>
+          </thead>
+          <tbody id="rules-tbody">
+            <!-- Dynamically filled -->
+          </tbody>
+        </table>
+        
+        <div style="display: flex; gap: 0.75rem; margin-top: 0.75rem;">
+          <input type="text" id="rule-prefix" class="fc" style="flex: 2; height: 36px;" placeholder="e.g. 192.168.1.">
+          <input type="text" id="rule-type" class="fc" style="flex: 2; height: 36px;" placeholder="e.g. LAN">
+          <button class="btn" style="flex: 1; padding: 0 1rem; height: 36px; display: inline-flex; align-items: center; justify-content: center;" onclick="addLinkRule()">Add Rule</button>
+        </div>
+      </div>
+
+      <div class="fg" style="margin-bottom: 1.5rem;">
+        <label style="display: flex; align-items: center;">
+          Default Link Type
+          <span class="info-tip" data-tip="ประเภทของลิงก์เริ่มต้น หาก IP ของอินเทอร์เฟสไม่เข้าเกณฑ์กฎ Subnet ด้านบน"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+        </label>
+        <input type="text" id="cfg-link-default" class="fc" placeholder="Other">
+      </div>
+
+      <!-- Skipped Interface Types -->
+      <h3>Ignored Interfaces (Skip Types)</h3>
+      <p style="color:var(--txt-m);font-size:.78rem;margin-bottom:1rem;margin-top:-0.5rem">ระบบจะไม่นำอินเทอร์เฟสที่มีชื่อขึ้นต้นด้วยคำเหล่านี้ไปตรวจสอบ Anomaly หรือวาดกราฟ (เช่น Loopback, Vlan)</p>
+      
+      <div style="background: var(--panel-2); border: 1px solid var(--brd); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
+        <div id="skip-tags-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <!-- Dynamically filled with pills -->
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <input type="text" id="new-skip-type" class="fc" style="height: 36px;" placeholder="e.g. Loopback">
+          <button class="btn" style="padding: 0 1.25rem; height: 36px; display: inline-flex; align-items: center; justify-content: center;" onclick="addSkipType()">+ Add Prefix</button>
+        </div>
+      </div>
+
+      <details style="margin-top: 1.5rem; cursor: pointer; color: var(--txt-m); font-size: 0.82rem;">
+        <summary style="font-weight: 600; padding: 0.5rem 0;">Advanced: View/Edit Raw config.yaml (JSON format)</summary>
+        <div style="margin-top: 0.5rem; cursor: default;">
+          <div class="fg">
+            <textarea id="cfg-raw" class="fc" style="min-height: 250px; font-family: monospace;" spellcheck="false"></textarea>
+          </div>
+        </div>
+      </details>
+      <button class="btn btn-full" style="margin-top: 1.25rem;" onclick="saveConfig()">Save General Settings</button>
     </div>
   </div>
 
@@ -90,16 +260,64 @@ tr:last-child td{border-bottom:none}
     <div class="card">
       <h3>Retrain Workflow</h3>
       <div class="model-grid">
-        <div class="metric"><div class="k">Model Version</div><div class="v" id="model-version">-</div></div>
-        <div class="metric"><div class="k">Model Status</div><div class="v" id="model-status">-</div></div>
-        <div class="metric"><div class="k">Training Rows</div><div class="v" id="model-rows">-</div></div>
-        <div class="metric"><div class="k">Features</div><div class="v" id="model-features">-</div></div>
+        <div class="metric">
+          <div class="k">
+            Model Version
+            <span class="info-tip" data-tip="เวอร์ชันโมเดล AI ปัจจุบันที่กำลังใช้งาน ยิ่งเทรนซ้ำเวอร์ชันจะยิ่งเพิ่มขึ้น"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </div>
+          <div class="v" id="model-version">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">
+            Model Status
+            <span class="info-tip" data-tip="สถานะของโมเดล AI ในปัจจุบัน (เช่น ready คือพร้อมใช้งานสำหรับการดึงและทำนายข้อมูล)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </div>
+          <div class="v" id="model-status">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">
+            Training Rows
+            <span class="info-tip" data-tip="จำนวนแถวของข้อมูลสถิติประวัติทราฟฟิกในอดีตที่นำมาใช้ป้อนให้ AI เรียนรู้พฤติกรรม"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </div>
+          <div class="v" id="model-rows">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">
+            Features
+            <span class="info-tip" data-tip="จำนวนตัวแปร/มิติข้อมูลเครือข่ายที่นำไปให้ AI ตรวจสอบ (เช่น load, reliability, input errors)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </div>
+          <div class="v" id="model-features">-</div>
+        </div>
       </div>
       <div class="model-grid">
-        <div class="metric"><div class="k">Precision</div><div class="v" id="eval-precision">-</div></div>
-        <div class="metric"><div class="k">Recall</div><div class="v" id="eval-recall">-</div></div>
-        <div class="metric"><div class="k">False Positive Rate</div><div class="v" id="eval-fpr">-</div></div>
-        <div class="metric"><div class="k">Supported Vendors</div><div class="v" id="vendors">-</div></div>
+        <div class="metric">
+          <div class="k">
+            Precision
+            <span class="info-tip" data-tip="ความแม่นยำในการเตือนภัยของ AI ยิ่งสูงแปลว่าเมื่อมีการเตือนจะเป็นภัยคุกคามจริงไม่ค่อยส่งการเตือนหลอก (False Alarm)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </div>
+          <div class="v" id="eval-precision">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">
+            Recall
+            <span class="info-tip" data-tip="อัตราการตรวจจับความผิดปกติที่มีอยู่ทั้งหมด ยิ่งสูงแปลว่า AI สามารถจับความผิดปกติได้ครบถ้วนไม่ตกหล่น"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </div>
+          <div class="v" id="eval-recall">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">
+            False Positive Rate
+            <span class="info-tip" data-tip="อัตราการแจ้งเตือนผิดพลาด (False Positive) ยิ่งน้อยยิ่งดี บ่งบอกว่า AI จะไม่แจ้งเตือนรบกวนทราฟฟิกปกติ"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </div>
+          <div class="v" id="eval-fpr">-</div>
+        </div>
+        <div class="metric">
+          <div class="k">
+            Supported Vendors
+            <span class="info-tip" data-tip="ยี่ห้อของอุปกรณ์เครือข่ายที่ระบบ NetSentinel AI สนับสนุนคำสั่งและโครงสร้าง CLI ในขณะนี้"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </div>
+          <div class="v" id="vendors">-</div>
+        </div>
       </div>
       <button class="btn" id="retrain-btn" onclick="startRetrain()">Retrain Model</button>
     </div>
@@ -111,11 +329,122 @@ tr:last-child td{border-bottom:none}
 
   <!-- Devices -->
   <div id="devices" class="tab">
+    <!-- Interactive Device List Table -->
     <div class="card">
-      <h3>Devices YAML</h3>
-      <div class="fg"><label>devices.yaml</label><textarea id="dev-raw" class="fc" style="min-height:400px" spellcheck="false"></textarea></div>
-      <button class="btn btn-full" onclick="saveDevices()">Save Devices</button>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+        <h3>Network Devices</h3>
+        <button class="btn" style="padding: 0.45rem 0.85rem; font-size: 0.78rem;" onclick="showAddDeviceForm()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right: 2px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Add Device
+        </button>
+      </div>
+      <div style="overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Host/IP</th>
+              <th>Type</th>
+              <th>Role</th>
+              <th>Zone</th>
+              <th>SNMP Community</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="devices-tbody">
+            <!-- Dynamically filled -->
+          </tbody>
+        </table>
+      </div>
     </div>
+
+    <!-- Device Form (Expandable Card) -->
+    <div class="card" id="device-form-card" style="display: none; animation: fadeIn 0.25s ease;">
+      <h3 id="device-form-title">Add Network Device</h3>
+      <input type="hidden" id="edit-device-index" value="-1">
+      
+      <div class="fr">
+        <div class="fg">
+          <label>
+            Device Name
+            <span class="info-tip" data-tip="ชื่อเรียกอุปกรณ์ในระบบ เช่น R1, SW-Core (ควรตรงกับ Hostname ของตัวอุปกรณ์)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <input type="text" id="dev-name" class="fc" placeholder="e.g. R1, SW-Core">
+        </div>
+        <div class="fg">
+          <label>
+            Host IP Address
+            <span class="info-tip" data-tip="IP Address สำหรับใช้จัดการเชื่อมต่อผ่าน SNMP หรือ Terminal CLI"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <input type="text" id="dev-host" class="fc" placeholder="e.g. 10.10.10.1">
+        </div>
+      </div>
+
+      <div class="fr">
+        <div class="fg">
+          <label>
+            Device Type
+            <span class="info-tip" data-tip="ระบบปฏิบัติการของอุปกรณ์เพื่อจับคู่โปรโตคอล CLI/SSH/Telnet ในการสั่ง Bounce หรือ Rate limit"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <select id="dev-type" class="fc">
+            <option value="cisco_ios_telnet">Cisco IOS (Telnet)</option>
+            <option value="cisco_ios">Cisco IOS (SSH)</option>
+            <option value="mikrotik_routeros">MikroTik RouterOS</option>
+            <option value="juniper_junos">Juniper JunOS</option>
+            <option value="arista_eos">Arista EOS</option>
+            <option value="generic">Generic SNMP</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>
+            Role
+            <span class="info-tip" data-tip="ระดับชั้นโครงสร้างของอุปกรณ์ในเครือข่าย ช่วยเรื่องจัดประเภทและวิเคราะห์ระดับความรุนแรงของภัย"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <select id="dev-role" class="fc">
+            <option value="core">Core Router</option>
+            <option value="distribution">Distribution Switch</option>
+            <option value="access">Access Switch / Endpoints</option>
+            <option value="firewall">Firewall</option>
+            <option value="server">Server</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fr">
+        <div class="fg">
+          <label>
+            Zone / Location
+            <span class="info-tip" data-tip="การจัดกลุ่มทางตรรกะ หรือที่ตั้งทางกายภาพของอุปกรณ์ เช่น Core, A, Zone-DMZ"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <input type="text" id="dev-zone" class="fc" placeholder="e.g. Core, A, DMZ">
+        </div>
+        <div class="fg">
+          <label>
+            SNMP Community
+            <span class="info-tip" data-tip="รหัสผ่าน Community String สำหรับเข้าถึงบริการ SNMP Read-Only (ค่าเริ่มต้นคือ public)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span>
+          </label>
+          <input type="text" id="dev-snmp" class="fc" placeholder="public">
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem;">
+        <button class="btn" style="background: var(--panel-2); color: var(--txt); border: 1px solid var(--brd);" onclick="hideDeviceForm()">Cancel</button>
+        <button class="btn" onclick="saveDeviceForm()">Save Device</button>
+      </div>
+    </div>
+
+    <!-- Raw Editor Collapsible Section -->
+    <details style="margin-top: 1.5rem; cursor: pointer; color: var(--txt-m); font-size: 0.82rem;">
+      <summary style="font-weight: 600; padding: 0.5rem 0;">Advanced: View/Edit Raw devices.yaml (JSON format)</summary>
+      <div style="margin-top: 0.5rem; cursor: default;">
+        <div class="card" style="margin: 0; padding: 1.25rem;">
+          <div class="fg">
+            <textarea id="dev-raw" class="fc" style="min-height:300px; font-family: monospace;" spellcheck="false"></textarea>
+          </div>
+          <button class="btn btn-full" onclick="saveRawDevices()">Save Raw JSON</button>
+        </div>
+      </div>
+    </details>
   </div>
 
   <!-- Env -->
@@ -131,6 +460,11 @@ tr:last-child td{border-bottom:none}
         <div class="fg"><label>Enable Secret</label><input type="password" id="env-dev-sec" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
       </div>
       <div class="fg"><label>SNMP Community</label><input type="password" id="env-snmp-com" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
+      <div class="fr">
+        <div class="fg"><label>SNMPv3 Username</label><input type="text" id="env-snmp-v3-user" class="fc"></div>
+        <div class="fg"><label>SNMPv3 Auth Password</label><input type="password" id="env-snmp-v3-auth" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
+        <div class="fg"><label>SNMPv3 Privacy Password</label><input type="password" id="env-snmp-v3-priv" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
+      </div>
       <button class="btn btn-full" onclick="saveEnv()">Save Environment</button>
     </div>
   </div>
@@ -203,22 +537,410 @@ async function startRetrain(){
   }catch(e){showToast('Retrain failed',true);const btn=document.getElementById('retrain-btn');if(btn)btn.disabled=false}
 }
 
+let devicesList = [];
+
+function renderDevicesTable() {
+  const tbody = document.getElementById('devices-tbody');
+  tbody.innerHTML = '';
+  if (devicesList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--txt-m); padding: 1.5rem;">No devices configured. Click "Add Device" to get started.</td></tr>';
+    return;
+  }
+
+  devicesList.forEach((dev, idx) => {
+    const tr = document.createElement('tr');
+    
+    // Name
+    const tdName = document.createElement('td');
+    tdName.style.fontWeight = '600';
+    tdName.textContent = dev.name || '-';
+    
+    // Host
+    const tdHost = document.createElement('td');
+    tdHost.textContent = dev.host || '-';
+    
+    // Type
+    const tdType = document.createElement('td');
+    tdType.textContent = dev.device_type || '-';
+    
+    // Role with badge
+    const tdRole = document.createElement('td');
+    const roleClass = dev.role === 'core' ? 'badge-up' : (dev.role === 'firewall' ? 'badge-anomaly' : 'badge-normal');
+    tdRole.innerHTML = `<span class="badge ${roleClass}">${dev.role || 'access'}</span>`;
+    
+    // Zone
+    const tdZone = document.createElement('td');
+    tdZone.textContent = dev.zone || dev.location || 'Core';
+    
+    // SNMP
+    const tdSnmp = document.createElement('td');
+    tdSnmp.style.fontFamily = 'monospace';
+    tdSnmp.textContent = dev.snmp_community || 'public';
+    
+    // Actions (Edit/Delete)
+    const tdActions = document.createElement('td');
+    
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn';
+    editBtn.style.cssText = 'padding: 0.25rem 0.5rem; font-size: 0.72rem; margin-right: 0.5rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.2);';
+    editBtn.textContent = 'Edit';
+    editBtn.onclick = () => editDevice(idx);
+    
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-err';
+    delBtn.style.cssText = 'padding: 0.25rem 0.5rem; font-size: 0.72rem;';
+    delBtn.textContent = 'Delete';
+    delBtn.onclick = () => deleteDevice(idx);
+    
+    tdActions.appendChild(editBtn);
+    tdActions.appendChild(delBtn);
+    
+    tr.appendChild(tdName);
+    tr.appendChild(tdHost);
+    tr.appendChild(tdType);
+    tr.appendChild(tdRole);
+    tr.appendChild(tdZone);
+    tr.appendChild(tdSnmp);
+    tr.appendChild(tdActions);
+    
+    tbody.appendChild(tr);
+  });
+}
+
+function showAddDeviceForm() {
+  document.getElementById('device-form-title').textContent = 'Add Network Device';
+  document.getElementById('edit-device-index').value = '-1';
+  
+  document.getElementById('dev-name').value = '';
+  document.getElementById('dev-host').value = '';
+  document.getElementById('dev-type').value = 'cisco_ios_telnet';
+  document.getElementById('dev-role').value = 'core';
+  document.getElementById('dev-zone').value = 'Core';
+  document.getElementById('dev-snmp').value = 'public';
+  
+  document.getElementById('device-form-card').style.display = 'block';
+  document.getElementById('device-form-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+function hideDeviceForm() {
+  document.getElementById('device-form-card').style.display = 'none';
+}
+
+function editDevice(idx) {
+  const dev = devicesList[idx];
+  document.getElementById('device-form-title').textContent = 'Edit Network Device';
+  document.getElementById('edit-device-index').value = idx;
+  
+  document.getElementById('dev-name').value = dev.name || '';
+  document.getElementById('dev-host').value = dev.host || '';
+  document.getElementById('dev-type').value = dev.device_type || 'cisco_ios_telnet';
+  document.getElementById('dev-role').value = dev.role || 'core';
+  document.getElementById('dev-zone').value = dev.zone || dev.location || 'Core';
+  document.getElementById('dev-snmp').value = dev.snmp_community || 'public';
+  
+  document.getElementById('device-form-card').style.display = 'block';
+  document.getElementById('device-form-card').scrollIntoView({ behavior: 'smooth' });
+}
+
+function deleteDevice(idx) {
+  const dev = devicesList[idx];
+  Swal.fire({
+    title: 'Remove Device?',
+    text: `Are you sure you want to remove device "${dev.name}" (${dev.host})?`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Yes, remove',
+    cancelButtonText: 'Cancel',
+    background: themeColor('--card'),
+    color: themeColor('--txt'),
+    confirmButtonColor: '#ef4444',
+    cancelButtonColor: '#3a3f58',
+  }).then((result) => {
+    if (result.isConfirmed) {
+      devicesList.splice(idx, 1);
+      saveDevicesList('Device removed successfully');
+    }
+  });
+}
+
+async function saveDeviceForm() {
+  const name = document.getElementById('dev-name').value.trim();
+  const host = document.getElementById('dev-host').value.trim();
+  const type = document.getElementById('dev-type').value;
+  const role = document.getElementById('dev-role').value;
+  const zone = document.getElementById('dev-zone').value.trim();
+  const snmp = document.getElementById('dev-snmp').value.trim() || 'public';
+  
+  if (!name || !host) {
+    showToast('Please fill in Name and Host IP address', true);
+    return;
+  }
+
+  const deviceObj = {
+    name: name,
+    host: host,
+    device_type: type,
+    role: role,
+    zone: zone,
+    location: zone,
+    snmp_community: snmp
+  };
+
+  const editIdx = parseInt(document.getElementById('edit-device-index').value);
+  if (editIdx >= 0) {
+    devicesList[editIdx] = deviceObj;
+  } else {
+    devicesList.push(deviceObj);
+  }
+
+  hideDeviceForm();
+  saveDevicesList(editIdx >= 0 ? 'Device updated successfully' : 'Device added successfully');
+}
+
+async function saveDevicesList(successMsg) {
+  try {
+    const payload = { devices: devicesList };
+    const r = await fetch('/api/settings/devices', {
+      method: 'POST',
+      headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (d.success) {
+      showToast(successMsg);
+      document.getElementById('dev-raw').value = JSON.stringify(payload, null, 2);
+      renderDevicesTable();
+    } else {
+      showToast('Failed to save devices: ' + d.message, true);
+    }
+  } catch (e) {
+    showToast('Error saving devices list', true);
+  }
+}
+
+async function saveRawDevices() {
+  try {
+    const payload = JSON.parse(document.getElementById('dev-raw').value);
+    const r = await fetch('/api/settings/devices', {
+      method: 'POST',
+      headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (d.success) {
+      showToast('Raw devices JSON saved');
+      devicesList = payload.devices || [];
+      renderDevicesTable();
+    } else {
+      showToast('Failed: ' + d.message, true);
+    }
+  } catch (e) {
+    showToast('Invalid JSON: ' + e.message, true);
+  }
+}
+
+let configData = {};
+
+function renderLinkRulesTable() {
+  const tbody = document.getElementById('rules-tbody');
+  tbody.innerHTML = '';
+  const rules = configData.link_types?.rules || [];
+  
+  if (rules.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--txt-m); padding: 1rem;">No custom link type rules defined.</td></tr>';
+    return;
+  }
+  
+  rules.forEach((rule, idx) => {
+    const tr = document.createElement('tr');
+    
+    const tdPrefix = document.createElement('td');
+    tdPrefix.style.fontFamily = 'monospace';
+    tdPrefix.textContent = rule.prefix || '-';
+    
+    const tdType = document.createElement('td');
+    tdType.innerHTML = `<span class="badge badge-normal">${rule.type || 'Other'}</span>`;
+    
+    const tdAction = document.createElement('td');
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-err';
+    btn.style.cssText = 'padding: 0.2rem 0.4rem; font-size: 0.68rem;';
+    btn.textContent = 'Remove';
+    btn.onclick = () => removeLinkRule(idx);
+    
+    tdAction.appendChild(btn);
+    tr.appendChild(tdPrefix);
+    tr.appendChild(tdType);
+    tr.appendChild(tdAction);
+    tbody.appendChild(tr);
+  });
+}
+
+function addLinkRule() {
+  const prefix = document.getElementById('rule-prefix').value.trim();
+  const type = document.getElementById('rule-type').value.trim();
+  
+  if (!prefix || !type) {
+    showToast('Please fill in both Prefix and Type', true);
+    return;
+  }
+  
+  if (!configData.link_types) configData.link_types = { default: 'Other', rules: [] };
+  if (!configData.link_types.rules) configData.link_types.rules = [];
+  
+  configData.link_types.rules.push({ prefix: prefix, type: type });
+  
+  document.getElementById('rule-prefix').value = '';
+  document.getElementById('rule-type').value = '';
+  
+  renderLinkRulesTable();
+  updateRawConfigTextarea();
+}
+
+function removeLinkRule(idx) {
+  if (configData.link_types && configData.link_types.rules) {
+    configData.link_types.rules.splice(idx, 1);
+    renderLinkRulesTable();
+    updateRawConfigTextarea();
+  }
+}
+
+function renderSkipTags() {
+  const container = document.getElementById('skip-tags-container');
+  container.innerHTML = '';
+  const skips = configData.anomaly?.skip_types || [];
+  
+  const validSkips = skips.filter(s => s !== null);
+  if (validSkips.length === 0) {
+    container.innerHTML = '<span style="color: var(--txt-m); font-size: 0.75rem;">No interfaces are currently ignored.</span>';
+    return;
+  }
+  
+  skips.forEach((skip, idx) => {
+    if (skip === null) return;
+    const tag = document.createElement('div');
+    tag.className = 'skip-tag';
+    tag.innerHTML = `
+      <span>${skip}</span>
+      <span class="skip-tag-remove" onclick="removeSkipType(${idx})">×</span>
+    `;
+    container.appendChild(tag);
+  });
+}
+
+function addSkipType() {
+  const input = document.getElementById('new-skip-type');
+  const value = input.value.trim();
+  
+  if (!value) {
+    showToast('Please enter an interface prefix', true);
+    return;
+  }
+  
+  if (!configData.anomaly) configData.anomaly = { skip_types: [] };
+  if (!configData.anomaly.skip_types) configData.anomaly.skip_types = [];
+  
+  if (configData.anomaly.skip_types.includes(value)) {
+    showToast('Prefix already exists', true);
+    return;
+  }
+  
+  configData.anomaly.skip_types.push(value);
+  input.value = '';
+  
+  renderSkipTags();
+  updateRawConfigTextarea();
+}
+
+function removeSkipType(idx) {
+  if (configData.anomaly && configData.anomaly.skip_types) {
+    configData.anomaly.skip_types.splice(idx, 1);
+    renderSkipTags();
+    updateRawConfigTextarea();
+  }
+}
+
+function updateRawConfigTextarea() {
+  if (!configData.collector) configData.collector = { interval: 30 };
+  if (!configData.data_retention) configData.data_retention = { days: 30, enabled: true };
+  if (!configData.model) configData.model = { threshold_load: 20, threshold_reliability: 200, threshold_errors: 10 };
+  
+  configData.collector.interval = parseInt(document.getElementById('cfg-interval').value) || 60;
+  configData.data_retention.days = parseInt(document.getElementById('cfg-retention').value) || 30;
+  configData.model.threshold_load = parseInt(document.getElementById('cfg-th-load').value) || 20;
+  configData.model.threshold_reliability = parseInt(document.getElementById('cfg-th-rel').value) || 200;
+  configData.model.threshold_errors = parseInt(document.getElementById('cfg-th-err').value) || 10;
+  
+  if (!configData.link_types) configData.link_types = { default: 'Other', rules: [] };
+  configData.link_types.default = document.getElementById('cfg-link-default').value.trim() || 'Other';
+  
+  document.getElementById('cfg-raw').value = JSON.stringify(configData, null, 2);
+}
+
 async function loadData(){
   try{
     let r=await fetch('/api/settings/config');if(r.status===401){window.location='/login';return}let d=await r.json();
-    if(d.success){document.getElementById('cfg-interval').value=d.data.collector.interval;document.getElementById('cfg-retention').value=d.data.data_retention?.days||30;document.getElementById('cfg-th-load').value=d.data.model.threshold_load;document.getElementById('cfg-th-rel').value=d.data.model.threshold_reliability;document.getElementById('cfg-th-err').value=d.data.model.threshold_errors;document.getElementById('cfg-raw').value=JSON.stringify(d.data,null,2)}
-    r=await fetch('/api/settings/devices');d=await r.json();if(d.success)document.getElementById('dev-raw').value=JSON.stringify(d.data,null,2);
-    r=await fetch('/api/settings/env');d=await r.json();if(d.success){const e=d.data;document.getElementById('env-discord-channel').value=e.DISCORD_CHANNEL_ID||'';document.getElementById('env-dev-user').value=e.DEVICE_USERNAME||'';document.getElementById('env-discord-token').value='';document.getElementById('env-discord-token').placeholder=e.DISCORD_TOKEN_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-dev-pass').value='';document.getElementById('env-dev-pass').placeholder=e.DEVICE_PASSWORD_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-dev-sec').value='';document.getElementById('env-dev-sec').placeholder=e.DEVICE_SECRET_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-snmp-com').value='';document.getElementById('env-snmp-com').placeholder=e.SNMP_COMMUNITY_CONFIGURED?'(saved — enter new to replace)':'(not set)'}
+    if(d.success){
+      configData = d.data;
+      document.getElementById('cfg-interval').value=d.data.collector.interval;
+      document.getElementById('cfg-retention').value=d.data.data_retention?.days||30;
+      document.getElementById('cfg-th-load').value=d.data.model.threshold_load;
+      document.getElementById('cfg-th-rel').value=d.data.model.threshold_reliability;
+      document.getElementById('cfg-th-err').value=d.data.model.threshold_errors;
+      document.getElementById('cfg-link-default').value=d.data.link_types?.default || 'Other';
+      document.getElementById('cfg-raw').value=JSON.stringify(d.data,null,2);
+      
+      renderLinkRulesTable();
+      renderSkipTags();
+    }
+    r=await fetch('/api/settings/devices');d=await r.json();
+    if(d.success){
+      devicesList = d.data.devices || [];
+      renderDevicesTable();
+      document.getElementById('dev-raw').value=JSON.stringify(d.data,null,2);
+    }
+    r=await fetch('/api/settings/env');d=await r.json();if(d.success){const e=d.data;document.getElementById('env-discord-channel').value=e.DISCORD_CHANNEL_ID||'';document.getElementById('env-dev-user').value=e.DEVICE_USERNAME||'';document.getElementById('env-snmp-v3-user').value=e.SNMP_V3_USER||'';document.getElementById('env-discord-token').value='';document.getElementById('env-discord-token').placeholder=e.DISCORD_TOKEN_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-dev-pass').value='';document.getElementById('env-dev-pass').placeholder=e.DEVICE_PASSWORD_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-dev-sec').value='';document.getElementById('env-dev-sec').placeholder=e.DEVICE_SECRET_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-snmp-com').value='';document.getElementById('env-snmp-com').placeholder=e.SNMP_COMMUNITY_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-snmp-v3-auth').value='';document.getElementById('env-snmp-v3-auth').placeholder=e.SNMP_V3_AUTH_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-snmp-v3-priv').value='';document.getElementById('env-snmp-v3-priv').placeholder=e.SNMP_V3_PRIV_CONFIGURED?'(saved — enter new to replace)':'(not set)'}
     loadModelStatus();
     loadUsers();
   }catch(e){showToast('Failed to load',true)}
 }
 
-async function saveConfig(){try{let c=JSON.parse(document.getElementById('cfg-raw').value);c.collector.interval=parseInt(document.getElementById('cfg-interval').value)||60;if(c.data_retention)c.data_retention.days=parseInt(document.getElementById('cfg-retention').value)||30;c.model.threshold_load=parseInt(document.getElementById('cfg-th-load').value)||20;c.model.threshold_reliability=parseInt(document.getElementById('cfg-th-rel').value)||200;c.model.threshold_errors=parseInt(document.getElementById('cfg-th-err').value)||10;const r=await fetch('/api/settings/config',{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify(c)});const d=await r.json();d.success?showToast('Config saved'):showToast(d.message,true)}catch(e){showToast(e.message||'Invalid JSON',true)}}
+async function saveConfig(){
+  try{
+    let rawText = document.getElementById('cfg-raw').value;
+    let c = JSON.parse(rawText);
+    
+    c.collector.interval = parseInt(document.getElementById('cfg-interval').value) || c.collector.interval;
+    if (c.data_retention) {
+      c.data_retention.days = parseInt(document.getElementById('cfg-retention').value) || c.data_retention.days;
+    }
+    c.model.threshold_load = parseInt(document.getElementById('cfg-th-load').value) || c.model.threshold_load;
+    c.model.threshold_reliability = parseInt(document.getElementById('cfg-th-rel').value) || c.model.threshold_reliability;
+    c.model.threshold_errors = parseInt(document.getElementById('cfg-th-err').value) || c.model.threshold_errors;
+    
+    if (!c.link_types) c.link_types = { default: 'Other', rules: [] };
+    c.link_types.default = document.getElementById('cfg-link-default').value.trim() || c.link_types.default;
+    
+    configData = c;
+    
+    const r=await fetch('/api/settings/config',{
+      method:'POST',
+      headers:csrfHeaders({'Content-Type':'application/json'}),
+      body:JSON.stringify(configData)
+    });
+    const d=await r.json();
+    if (d.success) {
+      showToast('Config saved');
+      renderLinkRulesTable();
+      renderSkipTags();
+      document.getElementById('cfg-raw').value = JSON.stringify(configData, null, 2);
+    } else {
+      showToast(d.message, true);
+    }
+  }catch(e){showToast(e.message||'Invalid JSON',true)}
+}
 
-async function saveDevices(){try{const v=JSON.parse(document.getElementById('dev-raw').value);const r=await fetch('/api/settings/devices',{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify(v)});const d=await r.json();d.success?showToast('Devices saved'):showToast(d.message,true)}catch(e){showToast(e.message||'Invalid JSON',true)}}
-
-async function saveEnv(){try{const p={DISCORD_CHANNEL_ID:document.getElementById('env-discord-channel').value,DEVICE_USERNAME:document.getElementById('env-dev-user').value};const t=document.getElementById('env-discord-token').value.trim();if(t)p.DISCORD_TOKEN=t;const dp=document.getElementById('env-dev-pass').value.trim();if(dp)p.DEVICE_PASSWORD=dp;const ds=document.getElementById('env-dev-sec').value.trim();if(ds)p.DEVICE_SECRET=ds;const sn=document.getElementById('env-snmp-com').value.trim();if(sn)p.SNMP_COMMUNITY=sn;const r=await fetch('/api/settings/env',{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify(p)});const d=await r.json();d.success?showToast('Environment saved'):showToast(d.message,true)}catch(e){showToast(e.message||'Error saving',true)}}
+async function saveEnv(){try{const p={DISCORD_CHANNEL_ID:document.getElementById('env-discord-channel').value,DEVICE_USERNAME:document.getElementById('env-dev-user').value,SNMP_V3_USER:document.getElementById('env-snmp-v3-user').value};const t=document.getElementById('env-discord-token').value.trim();if(t)p.DISCORD_TOKEN=t;const dp=document.getElementById('env-dev-pass').value.trim();if(dp)p.DEVICE_PASSWORD=dp;const ds=document.getElementById('env-dev-sec').value.trim();if(ds)p.DEVICE_SECRET=ds;const sn=document.getElementById('env-snmp-com').value.trim();if(sn)p.SNMP_COMMUNITY=sn;const sa=document.getElementById('env-snmp-v3-auth').value.trim();if(sa)p.SNMP_V3_AUTH=sa;const sp=document.getElementById('env-snmp-v3-priv').value.trim();if(sp)p.SNMP_V3_PRIV=sp;const r=await fetch('/api/settings/env',{method:'POST',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify(p)});const d=await r.json();d.success?showToast('Environment saved'):showToast(d.message,true)}catch(e){showToast(e.message||'Error saving',true)}}
 
 async function loadUsers(){try{const r=await fetch('/api/users');const d=await r.json();const tb=document.getElementById('users-tbody');tb.innerHTML='';if(!d.success){showToast(d.message||'Failed to load users',true);return}d.users.forEach(u=>{const tr=document.createElement('tr');const tdId=document.createElement('td');tdId.textContent=u.id;const tdUser=document.createElement('td');tdUser.style.fontWeight='600';tdUser.textContent=u.username;const tdRole=document.createElement('td');const sel=document.createElement('select');sel.className='fc';sel.style.cssText='padding:.2rem .4rem;font-size:.75rem;width:auto';['admin','user'].forEach(rn=>{const op=document.createElement('option');op.value=rn;op.textContent=rn;if(u.role===rn)op.selected=true;sel.appendChild(op)});sel.addEventListener('change',()=>changeRole(u.id,sel.value));tdRole.appendChild(sel);const tdCreated=document.createElement('td');tdCreated.style.color='var(--txt-m)';tdCreated.textContent=u.created_at;const tdAct=document.createElement('td');const btn=document.createElement('button');btn.className='btn btn-err';btn.style.cssText='padding:.3rem .6rem;font-size:.7rem';btn.textContent='Delete';btn.addEventListener('click',()=>delUser(u.id,u.username));tdAct.appendChild(btn);tr.appendChild(tdId);tr.appendChild(tdUser);tr.appendChild(tdRole);tr.appendChild(tdCreated);tr.appendChild(tdAct);tb.appendChild(tr)})}catch(e){showToast('Failed to load users',true)}}
 

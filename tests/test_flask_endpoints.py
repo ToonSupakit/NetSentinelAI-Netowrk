@@ -37,7 +37,7 @@ def test_user_can_read_status_but_cannot_access_admin_users(client, monkeypatch)
     monkeypatch.setattr(
         dash,
         "get_device_status",
-        lambda: [
+        lambda *args, **kwargs: [
             (
                 "R1",
                 "Gi0/0",

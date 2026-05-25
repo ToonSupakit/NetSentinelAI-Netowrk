@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<title>NetSentinel AI — Web Console</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="/static/theme.css" rel="stylesheet">
+<script src="/static/theme.js"></script>
+<link href="/static/sidebar.css" rel="stylesheet">
+<!-- Xterm.js library for high-performance terminal emulator inside the web browser -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<style>
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);display:flex;min-height:100vh}
+.main{flex:1;padding:2.25rem;min-width:0;display:flex;flex-direction:column;gap:1.5rem}
+.header{display:flex;justify-content:space-between;align-items:center}
+.header h2{font-size:1.25rem;font-weight:700}
+.card{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:1.5rem;box-shadow:var(--shadow-sm);display:flex;flex-direction:column;flex:1;min-height:0}
+.tools{display:flex;gap:0.75rem;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap}
+.select{background:var(--panel-2);border:1px solid var(--brd);color:var(--txt);border-radius:8px;font-family:inherit;font-size:0.82rem;height:38px;padding:0 0.75rem;transition:all 0.2s}
+.select:focus{outline:none;border-color:var(--ac);box-shadow:var(--focus)}
+.btn{background:var(--ac);color:#fff;border:none;padding:0 1.25rem;border-radius:8px;font-weight:600;font-size:0.82rem;height:38px;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:0.5rem;font-family:inherit}
+.btn:hover{background:var(--ac-h)}
+.btn-danger{background:var(--err-bg);color:var(--err);border:1px solid rgba(239,68,68,0.2)}
+.btn-danger:hover{background:var(--err);color:#fff}
+.status-indicator{display:inline-flex;align-items:center;gap:0.5rem;font-size:0.78rem;font-weight:600;background:var(--panel-2);padding:0.4rem 0.8rem;border-radius:20px;border:1px solid var(--brd)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#64748b}
+.status-dot.connected{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.status-dot.connecting{background:var(--wrn);box-shadow:0 0 8px var(--wrn)}
+.status-dot.disconnected{background:var(--err);box-shadow:0 0 8px var(--err)}
+
+/* Premium Terminal container */
+.terminal-container {
+  flex:1;
+  background:#0a0d14;
+  border:1px solid var(--brd);
+  border-radius:12px;
+  padding:1rem;
+  overflow:hidden;
+  position:relative;
+  box-shadow:inset 0 4px 20px rgba(0,0,0,0.6)
+}
+#terminal {
+  width:100%;
+  height:100%;
+}
+</style>
+</head>
+<body>
+
+{% include 'sidebar.html' %}
+
+<div class="main">
+  <div class="header">
+    <h2>Interactive CLI Web Console</h2>
+  </div>
+
+  <div class="card">
+    <div class="tools">
+      <select class="select" id="device-select" style="min-width: 200px;">
+        <!-- Filled dynamically -->
+      </select>
+      <button class="btn" id="connect-btn" onclick="toggleTerminalConnection()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Connect Terminal
+      </button>
+      <div class="status-indicator">
+        <div class="status-dot" id="status-dot"></div>
+        <span id="status-text">Disconnected</span>
+      </div>
+    </div>
+
+    <div class="terminal-container">
+      <div id="terminal"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const socket = io();
+let term = null;
+let fitAddon = null;
+let isConnected = false;
+
+// Fetch devices list for selection dropdown
+async function loadDevices() {
+  try {
+    const r = await fetch('/api/settings/devices');
+    const d = await r.json();
+    if (d.success) {
+      const select = document.getElementById('device-select');
+      const devs = d.data.devices || [];
+      if (devs.length === 0) {
+        select.innerHTML = '<option value="">No devices registered</option>';
+        return;
+      }
+      devs.forEach(dev => {
+        const opt = document.createElement('option');
+        opt.value = dev.name;
+        opt.textContent = `${dev.name} (${dev.host})`;
+        select.appendChild(opt);
+      });
+    }
+  } catch(e) {
+    console.error("Failed to load devices list", e);
+  }
+}
+
+// Initialize the Xterm.js terminal emulator
+function initTerminal() {
+  try {
+    term = new Terminal({
+      cursorBlink: true,
+      fontFamily: "'Courier New', Courier, monospace",
+      fontSize: 14,
+      theme: {
+        background: '#0a0d14',
+        foreground: '#a9b1d6',
+        cursor: '#f7768e',
+        black: '#32344a',
+        red: '#f7768e',
+        green: '#9ece6a',
+        yellow: '#e0af68',
+        blue: '#7aa2f7',
+        magenta: '#bb9af3',
+        cyan: '#7dcfff',
+        white: '#a9b1d6',
+        brightBlack: '#444b6a',
+        brightRed: '#ff7a93',
+        brightGreen: '#b9f27c',
+        brightYellow: '#ff9e64',
+        brightBlue: '#7da6ff',
+        brightMagenta: '#bb9af3',
+        brightCyan: '#0db9d7',
+        brightWhite: '#acb0d0'
+      }
+    });
+
+    term.open(document.getElementById('terminal'));
+
+    // Try loading fit addon safely
+    try {
+      if (typeof FitAddon !== 'undefined' && FitAddon.FitAddon) {
+        fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        setTimeout(() => {
+          try {
+            fitAddon.fit();
+          } catch(fitErr) {
+            console.warn("xterm fit error:", fitErr);
+          }
+        }, 100);
+      } else {
+        console.warn("xterm-addon-fit is not loaded or not defined globally.");
+      }
+    } catch(addonErr) {
+      console.warn("xterm loading fit addon failed safely:", addonErr);
+    }
+
+    // Print welcome info
+    term.writeln("\x1b[1;36mNetSentinel AI — Web CLI Terminal Console\x1b[0m");
+    term.writeln("Select a Cisco IOSv switch above and click 'Connect Terminal' to get started.\r\n");
+
+    // Send keystrokes directly to backend over Socket.IO
+    term.onData(data => {
+      if (isConnected) {
+        socket.emit('terminal_input', { data: data });
+      }
+    });
+
+    // Keep terminal fitting cleanly on browser window resize
+    window.addEventListener('resize', () => {
+      if (fitAddon) {
+        try {
+          fitAddon.fit();
+        } catch(e) {}
+      }
+    });
+
+  } catch(err) {
+    console.error("Xterm.js failed to initialize:", err);
+    const container = document.getElementById('terminal');
+    if (container) {
+      container.innerHTML = `<div style="color:var(--err);padding:1rem;font-size:0.9rem;font-family:monospace;">
+        ❌ Xterm.js failed to load. Please verify your internet connection or CDN availability.<br>
+        Error: ${err.message}
+      </div>`;
+    }
+  }
+}
+
+// Connect or Disconnect to the selected device
+function toggleTerminalConnection() {
+  const device = document.getElementById('device-select').value;
+  if (!device) {
+    Swal.fire({
+      icon: 'warning',
+      title: 'No Device Selected',
+      text: 'Please select a device to connect!',
+      background: themeColor('--card'),
+      color: themeColor('--txt')
+    });
+    return;
+  }
+
+  const btn = document.getElementById('connect-btn');
+
+  if (isConnected) {
+    // Disconnect
+    socket.emit('terminal_disconnect');
+    btn.className = 'btn';
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> Connect Terminal`;
+    updateStatus('disconnected');
+    isConnected = false;
+  } else {
+    // Connect
+    btn.className = 'btn btn-danger';
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Disconnect`;
+    updateStatus('connecting');
+    if (term) {
+      try {
+        term.clear();
+      } catch(e) {}
+    }
+    socket.emit('terminal_connect', { device_name: device });
+    isConnected = true;
+  }
+}
+
+function updateStatus(status, errMessage = "") {
+  const dot = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+
+  dot.className = `status-dot ${status}`;
+
+  if (status === 'connected') {
+    text.textContent = 'Connected';
+  } else if (status === 'connecting') {
+    text.textContent = 'Connecting...';
+  } else if (status === 'disconnected') {
+    text.textContent = 'Disconnected';
+  } else if (status === 'error') {
+    text.textContent = `Error: ${errMessage}`;
+  }
+}
+
+// Socket.IO event listeners
+socket.on('terminal_output', data => {
+  if (term) {
+    term.write(data.data);
+  }
+});
+
+socket.on('terminal_status', data => {
+  const status = data.status;
+  updateStatus(status, data.message || "");
+  
+  if (status === 'disconnected' || status === 'error') {
+    const btn = document.getElementById('connect-btn');
+    btn.className = 'btn';
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> Connect Terminal`;
+    isConnected = false;
+  }
+});
+
+// Setup on DOM load
+document.addEventListener('DOMContentLoaded', () => {
+  loadDevices();
+  initTerminal();
+});
+</script>
+</body>
+</html>

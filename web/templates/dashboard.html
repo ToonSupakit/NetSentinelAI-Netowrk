@@ -154,7 +154,7 @@ async function fixNow(d, i) {
         const r = await fetch(`/api/fix/${encodeURIComponent(d)}/${encodeURIComponent(i)}`, {method:'POST',headers:csrfHeaders()});
         const j = await r.json();
         if (j.success) {
-          showToast(j.message, 'a');
+          RemediationManager.start(d, i, 'fix', 'Bouncing Port...', `Bouncing interface <b>${i}</b> on <b>${d}</b>.<br>Please wait, GNS3 devices may take up to 15 seconds to apply.`);
         } else {
           showToast('Failed: ' + j.message, 'e');
         }
@@ -209,7 +209,7 @@ async function rateLimit(d, i) {
         });
         const j = await r.json();
         if (j.success) {
-          showToast(j.message, 'a');
+          RemediationManager.start(d, i, 'limit', 'Applying Rate Limit...', `Applying rate limit on interface <b>${i}</b> on <b>${d}</b>.`);
         } else {
           showToast('Failed: ' + j.message, 'e');
         }
@@ -238,7 +238,7 @@ async function removeLimitNow(d, i) {
         const r = await fetch(`/api/removelimit/${encodeURIComponent(d)}/${encodeURIComponent(i)}`, {method:'POST',headers:csrfHeaders()});
         const j = await r.json();
         if (j.success) {
-          showToast(j.message, 'a');
+          RemediationManager.start(d, i, 'removelimit', 'Removing Rate Limit...', `Removing rate limit on interface <b>${i}</b> on <b>${d}</b>.`);
         } else {
           showToast('Failed: ' + j.message, 'e');
         }
@@ -253,7 +253,7 @@ async function loadStatus(){
   try{const r=await fetch('/api/status');if(r.status===401){window.location='/login';return}if(!r.ok){const e=await r.json().catch(()=>({message:'Status data unavailable'}));throw new Error(e.message||'Status data unavailable')}const data=await r.json();const tb=document.getElementById('interface-tbody');tb.innerHTML='';
   const isAdmin=document.body.dataset.isAdmin==='true';
   data.forEach(row=>{
-    if(row.interface==='ALL'&&row.label==='normal')return;
+    if(row.interface==='ALL' && row.status==='up' && row.label==='normal')return;
     const tx=Math.round(row.network_load/255*100),rx=Math.round(row.rxload/255*100);
     const tr=document.createElement('tr');
 
@@ -261,7 +261,11 @@ async function loadStatus(){
     tr.appendChild(tdText(row.interface));
     tr.appendChild(tdText(row.ip,'color:var(--txt-m)'));
     const statusTd=document.createElement('td');
-    statusTd.appendChild(badge(row.status,row.status==='up'?'b-u':'b-d'));
+    if (row.status === 'down' || row.status === 'offline' || row.status === 'Cannot Connect') {
+      statusTd.appendChild(badge('Cannot Connect', 'b-d'));
+    } else {
+      statusTd.appendChild(badge(row.status,row.status==='up'?'b-u':'b-d'));
+    }
     tr.appendChild(statusTd);
     tr.appendChild(loadCell(tx));
     tr.appendChild(loadCell(rx));
@@ -270,9 +274,9 @@ async function loadStatus(){
     tr.appendChild(labelTd);
 
     const actionsTd=document.createElement('td');
-    if((row.status==='down'||row.status==='admin_down')&&isAdmin){
+    if(row.status==='down'||row.status==='admin_down'){
       actionsTd.appendChild(actionButton('Fix','act-btn act-fix',()=>fixNow(row.device,row.interface)));
-    }else if(row.status==='up'&&isAdmin){
+    }else if(row.status==='up'){
       actionsTd.appendChild(actionButton('Limit','act-btn act-rl',()=>rateLimit(row.device,row.interface)));
       actionsTd.appendChild(actionButton('Unlimit','act-btn',()=>removeLimitNow(row.device,row.interface),'background:rgba(99,102,241,.15);color:#818cf8;margin-left:5px'));
     }else{
@@ -296,7 +300,8 @@ if(ds!==last){const s=document.createElement('div');s.style.cssText='padding:.4r
 const tx=Math.round(row.network_load/255*100),rx=Math.round(row.rxload/255*100);const el=document.createElement('div');el.className='fi';
 const icon=document.createElement('div');icon.className='fs '+(row.is_fixed?'o':'a');icon.textContent=row.is_fixed?'✓':'!';
 const content=document.createElement('div');content.className='fc';
-const title=document.createElement('div');title.className='ft';title.textContent=(row.device||'')+' - '+(row.interface||'');
+const title=document.createElement('div');title.className='ft';
+if(row.interface==='ALL'){title.textContent=(row.device||'');}else{title.textContent=(row.device||'')+' - '+(row.interface||'');}
 const sub=document.createElement('div');sub.className='fsu';sub.textContent='TX '+tx+'% | RX '+rx+'% | '+(row.is_fixed?'Fixed':'Pending')+(row.severity?' | '+row.severity:'')+(row.detection_source?' | '+row.detection_source:'')+(row.notification_suppressed?' | correlated '+(row.correlated_with||'root'):'');sub.style.color=row.is_fixed?'var(--ok)':'var(--txt-m)';
 const timeEl=document.createElement('div');timeEl.className='ftime';timeEl.textContent=tm;
 content.appendChild(title);content.appendChild(sub);el.appendChild(icon);el.appendChild(content);el.appendChild(timeEl);
@@ -308,9 +313,20 @@ const fr=d.fix_rate;const totAnom=fr&&fr[0]!=null?Number(fr[0]):0;
 if(totAnom>0&&fr[2]!=null&&!Number.isNaN(Number(fr[2]))){document.getElementById('c-fix').textContent=fr[2]+'%';document.getElementById('c-fix-s').textContent=(fr[1]!=null?fr[1]:0)+'/'+totAnom+' resolved'}else{document.getElementById('c-fix').textContent='-';document.getElementById('c-fix-s').textContent='No data'}}catch(e){showToast(e.message||'Analytics data unavailable','e')}}
 
 const socket=io();
-socket.on('anomaly',d=>{showToast('ANOMALY: '+d.device+' – '+d.intf,'e');loadFeed();loadStatus()});
+socket.on('anomaly',d=>{
+  const msg=d.intf==='ALL'?d.device:d.device+' – '+d.intf;
+  showToast('ANOMALY: '+msg,'e');
+  loadFeed();
+  loadStatus();
+});
 socket.on('device_down',d=>{showToast('DEVICE DOWN: '+d.device,'e');loadFeed();loadStatus();loadAnalytics()});
-socket.on('remediation_result',d=>{if(d.success){showToast(d.message,'s');refresh();setTimeout(refresh,3000);setTimeout(refresh,8000);}else{showToast(d.message,'e');}});
+socket.on('remediation_result',d=>{
+  if(d.success){
+    refresh();
+    setTimeout(refresh,3000);
+    setTimeout(refresh,8000);
+  }
+});
 async function refresh(){await Promise.all([loadStatus(),loadFeed(),loadAnalytics()])}
 refresh();setInterval(refresh,10000);
 </script>

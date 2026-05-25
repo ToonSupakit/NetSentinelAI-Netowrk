@@ -11,6 +11,7 @@ from app.db import (
     delete_user,
     update_user_role,
     mark_anomalies_fixed_for_interface,
+    engine,
 )
 from app.runtime import request_collect_now
 from app.model_registry import load_metadata
@@ -328,6 +329,568 @@ def traffic_page():
     return render_template("traffic.html")
 
 
+def in_same_30_subnet(ip1, ip2):
+    try:
+        p1 = list(map(int, ip1.split('.')))
+        p2 = list(map(int, ip2.split('.')))
+        if len(p1) != 4 or len(p2) != 4:
+            return False
+        if p1[0:3] != p2[0:3]:
+            return False
+        return (p1[3] // 4) == (p2[3] // 4)
+    except Exception:
+        return False
+
+
+@app.route("/topology")
+@login_required
+def topology_page():
+    return render_template("topology.html")
+
+
+@app.route("/logs")
+@login_required
+def logs_page():
+    return render_template("logs.html")
+
+
+@app.route("/terminal")
+@admin_required
+def terminal_page():
+    return render_template("terminal.html")
+
+
+@app.route("/api/syslogs", methods=["GET"])
+@login_required
+def api_get_syslogs():
+    device = request.args.get("device", "all")
+    severity = request.args.get("severity", "all")
+    search = request.args.get("search", "")
+    
+    query = "SELECT device_name, ip_address, facility, severity, mnemonic, message, ai_cause, ai_suggestion, received_at FROM device_syslogs WHERE 1=1"
+    params = {}
+    
+    if device != "all":
+        query += " AND device_name = :device"
+        params["device"] = device
+    if severity != "all":
+        query += " AND severity = :severity"
+        params["severity"] = severity
+    if search:
+        query += " AND (message LIKE :search OR mnemonic LIKE :search OR facility LIKE :search)"
+        params["search"] = f"%{search}%"
+        
+    query += " ORDER BY received_at DESC LIMIT 100"
+    
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text(query), params).fetchall()
+            logs = []
+            for r in rows:
+                logs.append({
+                    "device_name": r[0],
+                    "ip_address": r[1],
+                    "facility": r[2],
+                    "severity": r[3],
+                    "mnemonic": r[4],
+                    "message": r[5],
+                    "ai_cause": r[6],
+                    "ai_suggestion": r[7],
+                    "received_at": r[8].strftime("%Y-%m-%d %H:%M:%S") if r[8] else ""
+                })
+            return jsonify({"success": True, "logs": logs})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/syslogs/analyze", methods=["POST"])
+@login_required
+def api_analyze_syslog_ondemand():
+    data = request.json
+    if not data or not data.get("log_text"):
+        return jsonify({"success": False, "message": "Log text required"}), 400
+        
+    log_text = data["log_text"]
+    
+    facility = "SYS"
+    mnemonic = "GENERIC"
+    message = log_text
+    
+    import re
+    cisco_pattern = r"%([A-Z0-9_]+)-([0-7])-([A-Z0-9_]+):\s*(.*)"
+    cisco_match = re.search(cisco_pattern, log_text)
+    if cisco_match:
+        facility = cisco_match.group(1)
+        mnemonic = cisco_match.group(3)
+        message = cisco_match.group(4).strip()
+        
+    from app.syslog_server import analyze_syslog_ai
+    ai_cause, ai_suggestion = analyze_syslog_ai(facility, mnemonic, message)
+    
+    return jsonify({
+        "success": True,
+        "facility": facility,
+        "mnemonic": mnemonic,
+        "message": message,
+        "ai_cause": ai_cause,
+        "ai_suggestion": ai_suggestion
+    })
+
+
+@app.route("/api/topology", methods=["GET"])
+@login_required
+def api_topology():
+    try:
+        try:
+            with open("config/devices.yaml", "r", encoding="utf-8") as f:
+                dev_conf = yaml.safe_load(f) or {}
+            active_devices = [d["name"] for d in dev_conf.get("devices", []) if "name" in d]
+        except Exception:
+            active_devices = None
+        status_rows = get_device_status(active_devices)
+        
+        # 1. Map database status rows for robust lookup
+        def normalize_intf(name):
+            n = str(name).lower().replace(" ", "")
+            n = n.replace("fastethernet", "fa")
+            n = n.replace("gigabitethernet", "gi")
+            n = n.replace("serial", "se")
+            return n
+
+        status_map = {}
+        for r in status_rows:
+            # key: (device_name.lower(), normalized_interface)
+            status_map[(r[0].lower(), normalize_intf(r[1]))] = {
+                "ip": r[2],
+                "status": r[3],
+                "txload": r[5],
+                "rxload": r[6],
+                "label": r[8]
+            }
+
+        # 2. Build Nodes (devices)
+        devices = []
+        for d in devices_config["devices"]:
+            # Check if this device is down based on its 'ALL' status
+            dev_all = status_map.get((d["name"].lower(), "all"))
+            is_down = False
+            if dev_all:
+                if dev_all["status"] in ("down", "offline", "Cannot Connect"):
+                    is_down = True
+            else:
+                is_down = True # brand new, never collected
+                
+            if not is_down:
+                devices.append({
+                    "id": d["name"],
+                    "name": d["name"],
+                    "role": d.get("role", "core"),
+                    "zone": d.get("zone", "Core"),
+                    "host": d["host"],
+                    "status": "up"
+                })
+            
+        # Ensure Client-1 and Client-2 are dynamically added to the nodes list so they display on the map
+        registered_names = [d["id"] for d in devices]
+        
+        # Determine Client-1 status: it depends on SW-L2-1
+        sw1_all = status_map.get(("sw-l2-1", "all"))
+        sw1_down = True
+        if sw1_all and sw1_all["status"] not in ("down", "offline", "Cannot Connect"):
+            sw1_down = False
+            
+        # Determine Client-2 status: it depends on SW-L2-2
+        sw2_all = status_map.get(("sw-l2-2", "all"))
+        sw2_down = True
+        if sw2_all and sw2_all["status"] not in ("down", "offline", "Cannot Connect"):
+            sw2_down = False
+
+        if "Client-1" not in registered_names and not sw1_down:
+            devices.append({
+                "id": "Client-1",
+                "name": "Client-1",
+                "role": "client",
+                "zone": "A",
+                "host": "10.10.3.10",
+                "status": "up"
+            })
+        if "Client-2" not in registered_names and not sw2_down:
+            devices.append({
+                "id": "Client-2",
+                "name": "Client-2",
+                "role": "client",
+                "zone": "Core",
+                "host": "10.10.2.10",
+                "status": "up"
+            })
+
+        # Define the exact backbone connections matching the GNS3 topology
+        backbone_links = [
+            ("R1", "FastEthernet0/1", "R2", "FastEthernet0/0"),
+            ("R2", "FastEthernet0/1", "ESW1", "FastEthernet0/0"),
+            ("R2", "FastEthernet1/0", "ESW2", "FastEthernet0/0"),
+            ("ESW1", "FastEthernet0/1", "SW-L2-1", "GigabitEthernet0/0"),
+            ("SW-L2-1", "GigabitEthernet0/1", "Client-1", "eth0"),
+            ("ESW2", "FastEthernet0/1", "SW-L2-2", "GigabitEthernet0/0"),
+            ("SW-L2-2", "GigabitEthernet0/1", "Client-2", "eth0"),
+        ]
+
+        edges = []
+        for dev1, intf1, dev2, intf2 in backbone_links:
+            # Check if both nodes exist in the devices list
+            valid_names = [d["id"] for d in devices]
+            if dev1 not in valid_names or dev2 not in valid_names:
+                continue
+
+            # Check if either device is down
+            dev1_is_polled = any(d["name"] == dev1 for d in devices_config["devices"])
+            dev2_is_polled = any(d["name"] == dev2 for d in devices_config["devices"])
+
+            dev1_is_down = False
+            if dev1_is_polled:
+                dev1_all = status_map.get((dev1.lower(), "all"))
+                if dev1_all:
+                    if dev1_all["status"] in ("down", "offline"):
+                        dev1_is_down = True
+                else:
+                    dev1_is_down = True
+            else:
+                if dev1 == "Client-1" and sw1_down:
+                    dev1_is_down = True
+                elif dev1 == "Client-2" and sw2_down:
+                    dev1_is_down = True
+
+            dev2_is_down = False
+            if dev2_is_polled:
+                dev2_all = status_map.get((dev2.lower(), "all"))
+                if dev2_all:
+                    if dev2_all["status"] in ("down", "offline"):
+                        dev2_is_down = True
+                else:
+                    dev2_is_down = True
+            else:
+                if dev2 == "Client-1" and sw1_down:
+                    dev2_is_down = True
+                elif dev2 == "Client-2" and sw2_down:
+                    dev2_is_down = True
+
+            state1 = status_map.get((dev1.lower(), normalize_intf(intf1)), {
+                "ip": "unassigned", "status": "up", "txload": 1, "rxload": 1, "label": "normal"
+            })
+            state2 = status_map.get((dev2.lower(), normalize_intf(intf2)), {
+                "ip": "unassigned", "status": "up", "txload": 1, "rxload": 1, "label": "normal"
+            })
+
+            # Override status to down if the parent device is down
+            status1 = "down" if dev1_is_down else state1["status"]
+            status2 = "down" if dev2_is_down else state2["status"]
+
+            status = "up"
+            if status1 in ("down", "admin_down") or status2 in ("down", "admin_down"):
+                status = "down"
+
+            label = "normal"
+            if state1["label"] == "anomaly" or state2["label"] == "anomaly":
+                label = "anomaly"
+
+            edge_id = f"{dev1}::{intf1}-{dev2}::{intf2}"
+            edges.append({
+                "id": edge_id,
+                "source": dev1,
+                "target": dev2,
+                "source_interface": intf1,
+                "target_interface": intf2,
+                "source_ip": state1["ip"],
+                "target_ip": state2["ip"],
+                "source_status": status1,
+                "target_status": status2,
+                "source_txload": state1["txload"],
+                "source_rxload": state1["rxload"],
+                "target_txload": state2["txload"],
+                "target_rxload": state2["rxload"],
+                "status": status,
+                "label": label
+            })
+                    
+        return jsonify({
+            "success": True,
+            "nodes": devices,
+            "edges": edges
+        })
+    except Exception as e:
+        log.error("Failed to generate topology data: %s", e)
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+# ── Config Backups & Diff Engine ──────────────────────────
+backup_status = {
+    "status": "idle",
+    "progress": 0,
+    "current_device": "",
+    "log": [],
+    "last_run": None
+}
+
+def run_backup_worker():
+    global backup_status
+    backup_status["status"] = "running"
+    backup_status["progress"] = 0
+    backup_status["current_device"] = ""
+    backup_status["log"] = ["Starting backup session..."]
+    
+    try:
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_dir = os.path.join("backups", timestamp)
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        devices = devices_config.get("devices", [])
+        if not devices:
+            backup_status["status"] = "failed"
+            backup_status["log"].append("No devices configured in devices.yaml!")
+            return
+            
+        username = os.getenv("DEVICE_USERNAME", "admin")
+        password = os.getenv("DEVICE_PASSWORD", "admin")
+        secret = os.getenv("DEVICE_SECRET", "admin")
+        
+        total = len(devices)
+        success_count = 0
+        
+        for idx, dev in enumerate(devices):
+            name = dev.get("name", "Unknown")
+            host = dev.get("host")
+            device_type = dev.get("device_type", "cisco_ios_telnet")
+            
+            backup_status["current_device"] = name
+            backup_status["log"].append(f"Connecting to {name} ({host})...")
+            backup_status["progress"] = int((idx / total) * 100)
+            
+            try:
+                net_connect = ConnectHandler(
+                    device_type=device_type,
+                    host=host,
+                    username=username,
+                    password=password,
+                    secret=secret,
+                    timeout=10,
+                )
+                net_connect.enable()
+                
+                backup_status["log"].append(f"  -> Fetching running-config from {name}...")
+                run_conf = net_connect.send_command("show run")
+                
+                filename = f"{name}_run.txt"
+                filepath = os.path.join(backup_dir, filename)
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(run_conf)
+                
+                backup_status["log"].append(f"  -> Fetching routing table from {name}...")
+                route_conf = net_connect.send_command("show ip route")
+                route_filename = f"{name}_route.txt"
+                route_filepath = os.path.join(backup_dir, route_filename)
+                with open(route_filepath, "w", encoding="utf-8") as f:
+                    f.write(route_conf)
+                    
+                net_connect.disconnect()
+                
+                backup_status["log"].append(f"✅ {name} configuration backed up successfully.")
+                success_count += 1
+            except Exception as e:
+                backup_status["log"].append(f"❌ Failed to backup {name}: {str(e)}")
+                
+        backup_status["progress"] = 100
+        backup_status["current_device"] = ""
+        backup_status["last_run"] = timestamp
+        
+        if success_count == total:
+            backup_status["status"] = "success"
+            backup_status["log"].append(f"🎉 Backup completed! Successfully backed up {success_count}/{total} devices.")
+        elif success_count > 0:
+            backup_status["status"] = "success"
+            backup_status["log"].append(f"⚠️ Backup completed with warnings. Backed up {success_count}/{total} devices.")
+        else:
+            backup_status["status"] = "failed"
+            backup_status["log"].append("❌ Backup session failed. Could not connect to any devices.")
+            
+    except Exception as ex:
+        backup_status["status"] = "failed"
+        backup_status["log"].append(f"Fatal error during backup session: {str(ex)}")
+
+@app.route("/backups")
+@login_required
+def backups_page():
+    return render_template("backups.html")
+
+@app.route("/api/backups/run", methods=["POST"])
+@login_required
+def api_run_backup():
+    global backup_status
+    if backup_status["status"] == "running":
+        return jsonify({"success": False, "message": "A backup session is already in progress."})
+        
+    t = threading.Thread(target=run_backup_worker, daemon=True)
+    t.start()
+    return jsonify({"success": True, "message": "Backup session started in background."})
+
+@app.route("/api/backups/status", methods=["GET"])
+@login_required
+def api_backup_status():
+    global backup_status
+    return jsonify({"success": True, "data": backup_status})
+
+@app.route("/api/backups/sessions", methods=["GET"])
+@login_required
+def api_backup_sessions():
+    try:
+        backup_dir = "backups"
+        if not os.path.exists(backup_dir):
+            return jsonify({"success": True, "sessions": []})
+            
+        sessions = []
+        for name in os.listdir(backup_dir):
+            path = os.path.join(backup_dir, name)
+            if os.path.isdir(path):
+                files = os.listdir(path)
+                configs = [f for f in files if f.endswith("_run.txt")]
+                
+                total_size = sum(os.path.getsize(os.path.join(path, f)) for f in files)
+                
+                sessions.append({
+                    "id": name,
+                    "timestamp": name,
+                    "device_count": len(configs),
+                    "size_bytes": total_size,
+                    "devices": [f.replace("_run.txt", "") for f in configs]
+                })
+                
+        sessions.sort(key=lambda s: s["id"], reverse=True)
+        return jsonify({"success": True, "sessions": sessions})
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route("/api/backups/session/<session_id>", methods=["GET"])
+@login_required
+def api_backup_session_files(session_id):
+    try:
+        session_id = os.path.basename(session_id)
+        path = os.path.join("backups", session_id)
+        if not os.path.exists(path) or not os.path.isdir(path):
+            return jsonify({"success": False, "message": "Session not found."}), 404
+            
+        files = os.listdir(path)
+        configs = [{"name": f.replace("_run.txt", ""), "type": "config", "filename": f} for f in files if f.endswith("_run.txt")]
+        routes = [{"name": f.replace("_route.txt", ""), "type": "route", "filename": f} for f in files if f.endswith("_route.txt")]
+        
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "configs": configs,
+            "routes": routes
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route("/api/backups/session/<session_id>/file/<filename>", methods=["GET"])
+@login_required
+def api_backup_file_content(session_id, filename):
+    try:
+        session_id = os.path.basename(session_id)
+        filename = os.path.basename(filename)
+        path = os.path.join("backups", session_id, filename)
+        if not os.path.exists(path):
+            return jsonify({"success": False, "message": "File not found."}), 404
+            
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+            
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "filename": filename,
+            "content": content
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+@app.route("/api/backups/diff", methods=["GET"])
+@login_required
+def api_backup_diff():
+    try:
+        session_a = request.args.get("session_a")
+        session_b = request.args.get("session_b")
+        filename = request.args.get("filename")
+        
+        if not session_a or not session_b or not filename:
+            return jsonify({"success": False, "message": "Missing session_a, session_b, or filename."}), 400
+            
+        session_a = os.path.basename(session_a)
+        session_b = os.path.basename(session_b)
+        filename = os.path.basename(filename)
+        
+        path_a = os.path.join("backups", session_a, filename)
+        path_b = os.path.join("backups", session_b, filename)
+        
+        text_a = ""
+        text_b = ""
+        
+        if os.path.exists(path_a):
+            with open(path_a, "r", encoding="utf-8", errors="ignore") as f:
+                text_a = f.read()
+        if os.path.exists(path_b):
+            with open(path_b, "r", encoding="utf-8", errors="ignore") as f:
+                text_b = f.read()
+                
+        import difflib
+        a_lines = text_a.splitlines()
+        b_lines = text_b.splitlines()
+        
+        diff = difflib.ndiff(a_lines, b_lines)
+        
+        diff_lines = []
+        line_a_num = 0
+        line_b_num = 0
+        
+        for line in diff:
+            if line.startswith("- "):
+                line_a_num += 1
+                diff_lines.append({
+                    "type": "delete",
+                    "line_a": line_a_num,
+                    "line_b": "",
+                    "text": line[2:]
+                })
+            elif line.startswith("+ "):
+                line_b_num += 1
+                diff_lines.append({
+                    "type": "add",
+                    "line_a": "",
+                    "line_b": line_b_num,
+                    "text": line[2:]
+                })
+            elif line.startswith("  "):
+                line_a_num += 1
+                line_b_num += 1
+                diff_lines.append({
+                    "type": "normal",
+                    "line_a": line_a_num,
+                    "line_b": line_b_num,
+                    "text": line[2:]
+                })
+            elif line.startswith("? "):
+                continue
+                
+        return jsonify({
+            "success": True,
+            "filename": filename,
+            "session_a": session_a,
+            "session_b": session_b,
+            "diff": diff_lines
+        })
+    except Exception as e:
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 @app.route("/settings")
 @admin_required
 def settings_page():
@@ -351,7 +914,102 @@ def api_health():
 @login_required
 def api_status():
     try:
-        return jsonify(serialize_status_rows(get_device_status()))
+        try:
+            with open("config/devices.yaml", "r", encoding="utf-8") as f:
+                dev_conf = yaml.safe_load(f) or {}
+            active_devices = [d["name"] for d in dev_conf.get("devices", []) if "name" in d]
+        except Exception:
+            active_devices = None
+            dev_conf = {}
+
+        raw_rows = get_device_status(active_devices)
+
+        # 1. Map database status rows for ALL interface to check if device is down
+        device_down_map = {}
+        for r in raw_rows:
+            dev_name = r[0]
+            intf_name = r[1]
+            status = r[3]
+            if intf_name == "ALL":
+                if status in ("down", "offline"):
+                    device_down_map[dev_name.lower()] = True
+                else:
+                    device_down_map[dev_name.lower()] = False
+
+        # Any active device that has no logs in the DB is considered down
+        for d in dev_conf.get("devices", []):
+            dname = d["name"].lower()
+            if dname not in device_down_map:
+                device_down_map[dname] = True
+
+        backbone_interfaces = {
+            "r1": [("FastEthernet0/0", "192.168.189.10"), ("FastEthernet0/1", "10.10.1.1")],
+            "r2": [("FastEthernet0/0", "10.10.1.2"), ("FastEthernet0/1", "10.10.3.1"), ("FastEthernet1/0", "10.10.2.1")],
+            "esw1": [("FastEthernet0/0", "10.10.3.2"), ("FastEthernet0/1", "unassigned")],
+            "esw2": [("FastEthernet0/0", "10.10.2.2"), ("FastEthernet0/1", "unassigned")],
+            "sw-l2-1": [("GigabitEthernet0/0", "10.10.100.4"), ("GigabitEthernet0/1", "unassigned")],
+            "sw-l2-2": [("GigabitEthernet0/0", "10.10.3.100"), ("GigabitEthernet0/1", "unassigned")],
+        }
+
+        # 2. Build overridden rows list
+        processed_rows = []
+        import datetime
+        now_str = str(datetime.datetime.now())
+
+        for d in dev_conf.get("devices", []):
+            dname = d["name"]
+            dname_lower = dname.lower()
+            is_down = device_down_map.get(dname_lower, True)
+
+            # Get all DB rows for this device that are NOT 'ALL'
+            dev_rows = [r for r in raw_rows if r[0].lower() == dname_lower and r[1] != "ALL"]
+
+            if is_down:
+                if dev_rows:
+                    for r in dev_rows:
+                        processed_rows.append({
+                            "device": r[0],
+                            "interface": r[1],
+                            "ip": r[2],
+                            "status": "Cannot Connect",
+                            "protocol": "down",
+                            "network_load": 0,
+                            "rxload": 0,
+                            "reliability": 0,
+                            "label": "anomaly",
+                            "collected_at": str(r[9])
+                        })
+                else:
+                    default_intfs = backbone_interfaces.get(dname_lower, [("Management", d["host"])])
+                    for intf, ip in default_intfs:
+                        processed_rows.append({
+                            "device": dname,
+                            "interface": intf,
+                            "ip": ip,
+                            "status": "Cannot Connect",
+                            "protocol": "down",
+                            "network_load": 0,
+                            "rxload": 0,
+                            "reliability": 0,
+                            "label": "anomaly",
+                            "collected_at": now_str
+                        })
+            else:
+                for r in dev_rows:
+                    processed_rows.append({
+                        "device": r[0],
+                        "interface": r[1],
+                        "ip": r[2],
+                        "status": r[3],
+                        "protocol": r[4],
+                        "network_load": r[5],
+                        "rxload": r[6],
+                        "reliability": r[7],
+                        "label": r[8],
+                        "collected_at": str(r[9])
+                    })
+
+        return jsonify(processed_rows)
     except Exception as e:
         log.error("Failed to load status data: %s", e)
         return jsonify({"success": False, "message": "Status data unavailable"}), 500
@@ -605,7 +1263,7 @@ def auto_rollback_task(device_name, intf, limit_mbps, delay_minutes):
 
 
 @app.route("/api/fix/<device_name>/<path:intf>", methods=["POST"])
-@admin_required
+@login_required
 @admin_action_rate_limited("fix")
 def api_fix(device_name, intf):
     socketio.start_background_task(execute_remediation_task, device_name, intf, "fix")
@@ -614,7 +1272,7 @@ def api_fix(device_name, intf):
 
 
 @app.route("/api/ratelimit/<device_name>/<path:intf>", methods=["POST"])
-@admin_required
+@login_required
 @admin_action_rate_limited("ratelimit")
 def api_ratelimit(device_name, intf):
     data = request.json or {}
@@ -644,7 +1302,7 @@ def api_ratelimit(device_name, intf):
 
 
 @app.route("/api/removelimit/<device_name>/<path:intf>", methods=["POST"])
-@admin_required
+@login_required
 @admin_action_rate_limited("removelimit")
 def api_removelimit(device_name, intf):
     socketio.start_background_task(execute_remediation_task, device_name, intf, "removelimit")
@@ -733,10 +1391,13 @@ def api_get_env():
             "data": {
                 "DISCORD_CHANNEL_ID": os.getenv("DISCORD_CHANNEL_ID", ""),
                 "DEVICE_USERNAME": os.getenv("DEVICE_USERNAME", ""),
+                "SNMP_V3_USER": os.getenv("SNMP_V3_USER", ""),
                 "DISCORD_TOKEN_CONFIGURED": _env_nonempty("DISCORD_TOKEN"),
                 "DEVICE_PASSWORD_CONFIGURED": _env_nonempty("DEVICE_PASSWORD"),
                 "DEVICE_SECRET_CONFIGURED": _env_nonempty("DEVICE_SECRET"),
                 "SNMP_COMMUNITY_CONFIGURED": _env_nonempty("SNMP_COMMUNITY"),
+                "SNMP_V3_AUTH_CONFIGURED": _env_nonempty("SNMP_V3_AUTH"),
+                "SNMP_V3_PRIV_CONFIGURED": _env_nonempty("SNMP_V3_PRIV"),
             },
         }
     )
@@ -827,6 +1488,120 @@ def api_update_user_role(user_id):
 
 
 # ── SocketIO ─────────────────────────────────────────────
+# Active VTY sessions map: sid -> { "net_connect": net_connect, "device": name, "read_thread_running": bool }
+active_terminals = {}
+
+def read_vty_stream(sid, conn):
+    while sid in active_terminals and active_terminals[sid]["read_thread_running"]:
+        try:
+            # Read standard stdout channel without blocking
+            data = conn.read_channel()
+            if data:
+                socketio.emit("terminal_output", {"data": data}, to=sid)
+            socketio.sleep(0.03)  # Yield execution to Socket.IO event loop
+        except Exception:
+            break
+    _cleanup_terminal(sid)
+
+def _cleanup_terminal(sid):
+    if sid in active_terminals:
+        t = active_terminals.pop(sid)
+        t["read_thread_running"] = False
+        try:
+            t["net_connect"].disconnect()
+            log.info(f"🔌 Closed active Web Terminal SSH/Telnet session for sid: {sid}")
+        except Exception:
+            pass
+        socketio.emit("terminal_status", {"status": "disconnected"}, to=sid)
+
+def vty_keepalive_loop():
+    """Background loop sending keep-alives to prevent Cisco exec-timeout from dropping active VTY shells."""
+    while True:
+        socketio.sleep(60)
+        sids = list(active_terminals.keys())
+        for sid in sids:
+            if sid in active_terminals:
+                try:
+                    conn = active_terminals[sid]["net_connect"]
+                    # Send a safe space + backspace sequence to refresh VTY exec-timeout
+                    conn.write_channel(" \b")
+                except Exception:
+                    pass
+
+@socketio.on("terminal_connect")
+def _terminal_connect(data):
+    device_name = data.get("device_name")
+    sid = request.sid
+    
+    if not device_name:
+        socketio.emit("terminal_status", {"status": "error", "message": "Device name required"}, to=sid)
+        return
+
+    # Gracefully close existing session for this socket if any
+    _cleanup_terminal(sid)
+
+    try:
+        # Look up device credentials in local devices config
+        dev = get_device_by_name(device_name)
+            
+        if not dev:
+            socketio.emit("terminal_status", {"status": "error", "message": f"Device {device_name} not registered"}, to=sid)
+            return
+
+        host = dev.get("host")
+        device_type = dev.get("device_type", "cisco_ios")
+        
+        # Load environment variables credentials
+        username = os.getenv("DEVICE_USERNAME", "admin")
+        password = os.getenv("DEVICE_PASSWORD", "admin")
+        secret = os.getenv("DEVICE_SECRET", "admin")
+
+        socketio.emit("terminal_output", {"data": f"\r\nConnecting to {device_name} ({host}) via {device_type}...\r\n"}, to=sid)
+
+        # Connect using Netmiko
+        net_connect = ConnectHandler(
+            device_type=device_type,
+            host=host,
+            username=username,
+            password=password,
+            secret=secret,
+            timeout=10,
+            fast_cli=True
+        )
+        net_connect.enable()
+
+        active_terminals[sid] = {
+            "net_connect": net_connect,
+            "device": device_name,
+            "read_thread_running": True
+        }
+
+        # Start VTY stream reader background task
+        socketio.start_background_task(read_vty_stream, sid, net_connect)
+        socketio.emit("terminal_status", {"status": "connected"}, to=sid)
+        log.info(f"🔌 Established active Web Terminal VTY session to {device_name} for sid: {sid}")
+
+    except Exception as e:
+        log.error(f"Failed terminal connection for {device_name}: {e}")
+        socketio.emit("terminal_output", {"data": f"\r\n❌ Connection failed: {str(e)}\r\n"}, to=sid)
+        socketio.emit("terminal_status", {"status": "error", "message": str(e)}, to=sid)
+
+@socketio.on("terminal_input")
+def _terminal_input(data):
+    sid = request.sid
+    keystroke = data.get("data")
+    if sid in active_terminals and keystroke:
+        try:
+            conn = active_terminals[sid]["net_connect"]
+            conn.write_channel(keystroke)
+        except Exception as e:
+            log.debug(f"Terminal write error: {e}")
+
+@socketio.on("disconnect")
+def _socketio_disconnect_terminal():
+    # Garbage collect terminal session immediately on WebSocket disconnect
+    _cleanup_terminal(request.sid)
+
 def push_anomaly(anomaly):
     socketio.emit("anomaly", anomaly)
 
@@ -837,4 +1612,6 @@ def push_device_down(info):
 
 def run_dashboard():
     log.info("Dashboard starting on http://0.0.0.0:5000")
-    socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, log_output=False)
+    # Start the keep-alive task background thread
+    socketio.start_background_task(vty_keepalive_loop)
+    socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, log_output=False, allow_unsafe_werkzeug=True)

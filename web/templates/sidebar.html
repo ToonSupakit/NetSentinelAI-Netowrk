@@ -18,7 +18,23 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       <span class="nav-text">Traffic</span>
     </a>
+    <a href="/topology" data-tooltip="Topology Map" id="nav-topology">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path d="M12 8l-5 8M12 8l5 8M8 19h8"/></svg>
+      <span class="nav-text">Topology Map</span>
+    </a>
+    <a href="/logs" data-tooltip="System Logs" id="nav-logs">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      <span class="nav-text">System Logs</span>
+    </a>
     {% if session.get('role') == 'admin' %}
+    <a href="/backups" data-tooltip="Config Backups" id="nav-backups">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+      <span class="nav-text">Config Backups</span>
+    </a>
+    <a href="/terminal" data-tooltip="Web Console" id="nav-terminal">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+      <span class="nav-text">Web Console</span>
+    </a>
     <a href="/settings" data-tooltip="Settings" id="nav-settings">
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       <span class="nav-text">Settings</span>
@@ -31,6 +47,10 @@
       <svg class="theme-icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       <span class="nav-text"><span data-theme-label>Light</span> Mode</span>
     </button>
+    <button type="button" class="theme-toggle" id="lang-toggle-btn" data-tooltip="Language" onclick="window.toggleLanguage()">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      <span class="nav-text" id="lang-toggle-text">EN / TH</span>
+    </button>
     <a href="/logout" data-tooltip="Logout" onclick="confirmLogout(event)">
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       <span class="nav-text">Logout</span>
@@ -41,7 +61,7 @@
 <script>
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed')}
 // Highlight active nav
-(function(){const p=location.pathname;const map={'/':"nav-dashboard",'/traffic':"nav-traffic",'/settings':"nav-settings"};const id=map[p];if(id)document.getElementById(id).classList.add('active')})();
+(function(){const p=location.pathname;const map={'/':"nav-dashboard",'/traffic':"nav-traffic",'/topology':"nav-topology",'/settings':"nav-settings",'/backups':"nav-backups",'/logs':"nav-logs",'/terminal':"nav-terminal"};const id=map[p];if(id)document.getElementById(id).classList.add('active')})();
 function themeColor(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
 
 function confirmLogout(event) {
@@ -62,5 +82,571 @@ function confirmLogout(event) {
       window.location.href = '/logout';
     }
   });
+}
+
+// Global remediation manager to persist progress cards across page reloads
+const RemediationManager = {
+  cardId: 'remediation-global-progress-card',
+  socket: null,
+
+  init() {
+    // Inject CSS styles for glassmorphic card in bottom-right corner
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .remediation-progress-card {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        width: 320px;
+        background: rgba(20, 20, 25, 0.85);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        color: #fff;
+        transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        animation: slideInRemediation 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        font-family: 'Inter', sans-serif;
+      }
+      :root[data-theme="light"] .remediation-progress-card {
+        background: rgba(255, 255, 255, 0.85);
+        border-color: rgba(0, 0, 0, 0.08);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+        color: #1a1f2c;
+      }
+      .remediation-progress-spinner {
+        width: 32px;
+        height: 32px;
+        border: 3px solid rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        border-top-color: #6366f1;
+        animation: remediationSpin 1s linear infinite;
+        flex-shrink: 0;
+      }
+      :root[data-theme="light"] .remediation-progress-spinner {
+        border-color: rgba(0, 0, 0, 0.08);
+        border-top-color: #6366f1;
+      }
+      .remediation-progress-content {
+        flex: 1;
+      }
+      .remediation-progress-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+        color: #fff;
+      }
+      :root[data-theme="light"] .remediation-progress-title {
+        color: #1a1f2c;
+      }
+      .remediation-progress-desc {
+        font-size: 0.72rem;
+        color: rgba(255, 255, 255, 0.7);
+        line-height: 1.3;
+      }
+      :root[data-theme="light"] .remediation-progress-desc {
+        color: #4a5568;
+      }
+      @keyframes remediationSpin {
+        to { transform: rotate(360deg); }
+      }
+      @keyframes slideInRemediation {
+        from { transform: translateY(40px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+
+    // Reconstruct state if navigating page
+    const active = sessionStorage.getItem('active_remediation');
+    if (active) {
+      const task = JSON.parse(active);
+      if (Date.now() - task.startTime > 90000) { // 90s auto-timeout
+        sessionStorage.removeItem('active_remediation');
+      } else {
+        this.show(task.title, task.desc);
+        this.setupSocket();
+      }
+    }
+
+    // Apply translation on load
+    this.translatePage();
+    window.translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+  },
+
+  show(title, desc) {
+    let card = document.getElementById(this.cardId);
+    if (!card) {
+      card = document.createElement('div');
+      card.id = this.cardId;
+      card.className = 'remediation-progress-card';
+      document.body.appendChild(card);
+    }
+    card.innerHTML = `
+      <div class="remediation-progress-spinner"></div>
+      <div class="remediation-progress-content">
+        <div class="remediation-progress-title">${title}</div>
+        <div class="remediation-progress-desc">${desc}</div>
+      </div>
+    `;
+  },
+
+  hide() {
+    const card = document.getElementById(this.cardId);
+    if (card) {
+      card.style.opacity = '0';
+      card.style.transform = 'translateY(40px)';
+      setTimeout(() => card.remove(), 300);
+    }
+  },
+
+  start(device, intf, action, title, desc) {
+    const task = {
+      device,
+      intf,
+      action,
+      title,
+      desc,
+      startTime: Date.now()
+    };
+    sessionStorage.setItem('active_remediation', JSON.stringify(task));
+    this.show(title, desc);
+    this.setupSocket();
+  },
+
+  setupSocket() {
+    if (this.socket) return;
+    
+    const connectSocket = () => {
+      if (typeof io === 'undefined') {
+        setTimeout(connectSocket, 200);
+        return;
+      }
+      this.socket = io();
+      this.socket.on('remediation_result', d => {
+        const active = sessionStorage.getItem('active_remediation');
+        if (!active) return;
+        
+        const task = JSON.parse(active);
+        if (d.device === task.device && d.intf === task.intf) {
+          sessionStorage.removeItem('active_remediation');
+          this.hide();
+          
+          if (typeof Swal !== 'undefined') {
+            const Toast = Swal.mixin({
+              toast: true,
+              position: 'bottom-end',
+              showConfirmButton: false,
+              timer: 4000,
+              timerProgressBar: true,
+              background: themeColor('--card'),
+              color: themeColor('--txt')
+            });
+            Toast.fire({
+              icon: d.success ? 'success' : 'error',
+              title: d.message
+            });
+          }
+          
+          // Call local page update functions
+          if (typeof refresh === 'function') {
+            refresh();
+          } else if (typeof fetchTopology === 'function') {
+            fetchTopology();
+          }
+        }
+      });
+    };
+    connectSocket();
+  }
+};
+
+// Translation Dictionary (English to Thai mapping)
+const TH_DICT = {
+  // Sidebar
+  "Dashboard": "แดชบอร์ด",
+  "Traffic": "ปริมาณข้อมูล / ทราฟฟิก",
+  "Topology Map": "แผนที่เครือข่าย",
+  "Config Backups": "สำรองข้อมูลอุปกรณ์",
+  "System Logs": "บันทึกระบบ / Syslogs",
+  "Web Console": "หน้าต่างคำสั่ง / CLI Terminal",
+  "Settings": "ตั้งค่าระบบ",
+  "Theme": "ธีมหน้าจอ",
+  "Light Mode": "โหมดสว่าง",
+  "Dark Mode": "โหมดมืด",
+  "Logout": "ออกจากระบบ",
+  "Confirm Logout": "ยืนยันการออกจากระบบ",
+  "Are you sure you want to log out of NetSentinel AI?": "คุณแน่ใจหรือไม่ว่าต้องการออกจากระบบ NetSentinel AI?",
+  
+  // New System Logs & Terminal translation elements
+  "Live Device Syslogs": "กล่องรับข้อมูลประวัติ Syslog สด",
+  "All Severities": "ระดับความสำคัญทั้งหมด",
+  "Search logs (e.g. OSPF, changed state)...": "ค้นหาประวัติบันทึกย้อนหลัง...",
+  "Interactive CLI Web Console": "แผงควบคุมระบบเครือข่าย Interactive CLI",
+  "Connect Terminal": "เชื่อมโยง Terminal",
+  "Disconnected": "ยังไม่ได้เชื่อมต่อ",
+  "Connected": "เชื่อมต่อสำเร็จ",
+  "AI Sandbox Analyzer": "กล่องทดสอบประเมิน AI Sandbox",
+  "Paste syslog here...": "พิมพ์หรือแปะข้อมูล Log เพื่อให้ AI ช่วยอธิบาย...",
+  "Analyze Log": "ประเมินข้อมูล Log",
+  "AI Log Diagnostics": "ระบบวิเคราะห์ประเมิน Log ของ AI",
+  "Original Log Entry": "ข้อความ Log ต้นทาง",
+  "AI Root Cause Analysis (สาเหตุหลัก)": "วิเคราะห์ประเมินสาเหตุ (AI Root Cause)",
+  "AI Recommended Troubleshooting (คำแนะนำแก้ไข)": "ขั้นตอนแก้ไขทางปฏิบัติ (AI Suggestion)",
+  
+  // Headers & Status
+  "Updated:": "อัปเดตเมื่อ:",
+  "Connecting...": "กำลังเชื่อมต่อ...",
+  "Error refreshing": "เกิดข้อผิดพลาดในการรีเฟรช",
+  
+  // Dashboard & Status Page
+  "Active Anomalies Feed": "รายงานข้อมูลทราฟฟิกผิดปกติล่าสุด",
+  "Uptime & Availability": "ระยะเวลาทำงานของอุปกรณ์ (Uptime)",
+  "Network Traffic Outflow Trend (Last 6 Hours)": "แนวโน้มปริมาณการส่งออกข้อมูลย้อนหลัง 6 ชั่วโมง",
+  "Anomaly Categories by Interface State": "ประเภทสิ่งผิดปกติตามสถานะอินเทอร์เฟซ",
+  "Top Devices by Anomaly Count": "5 อันดับอุปกรณ์ที่เกิดสิ่งผิดปกติบ่อยสุด",
+  "Top Interfaces by Anomaly Count": "5 อันดับอินเทอร์เฟซที่เกิดสิ่งผิดปกติบ่อยสุด",
+  "Live Status Monitoring": "การมอนิเตอร์สถานะอุปกรณ์แบบเรียลไทม์",
+  "Total Records": "บันทึกข้อมูลทั้งหมด",
+  "Anomaly Today": "สิ่งผิดปกติวันนี้",
+  "Total Normal": "ข้อมูลปกติทั้งหมด",
+  "Fix Rate": "อัตราการแก้ไขสำเร็จ",
+  "Interface Status": "สถานะอินเทอร์เฟซ",
+  "Anomaly Feed": "ประวัติสิ่งผิดปกติ",
+  "Filter": "กรองข้อมูล",
+  "All": "ทั้งหมด",
+  
+  // Table headers (all cases)
+  "Device": "อุปกรณ์",
+  "DEVICE": "อุปกรณ์",
+  "Interface": "อินเทอร์เฟซ",
+  "INTERFACE": "อินเทอร์เฟซ",
+  "IP": "ไอพีแอดเดรส",
+  "IP Address": "ไอพีแอดเดรส",
+  "IP ADDRESS": "ไอพีแอดเดรส",
+  "Status": "สถานะทางกายภาพ",
+  "STATUS": "สถานะทางกายภาพ",
+  "Protocol": "โปรโตคอล",
+  "PROTOCOL": "โปรโตคอล",
+  "TX": "อัตราส่ง (TX)",
+  "TX LOAD": "อัตราส่ง (TX)",
+  "RX": "อัตรารับ (RX)",
+  "RX LOAD": "อัตราส่ง (RX)",
+  "Reliability": "ความเสถียร",
+  "RELIABILITY": "ความเสถียร",
+  "Label": "ป้ายกำกับ",
+  "LABEL": "ป้ายกำกับ",
+  "Actions": "ตัวดำเนินการ",
+  "ACTIONS": "ตัวดำเนินการ",
+  "State": "สถานะการใช้งาน",
+  
+  // Interface actions and protocol states
+  "All interfaces OK (Rules OK, AI OK)": "พอร์ตทั้งหมดปกติดี (กฎตรรกะปกติ, ปัญญาประดิษฐ์ปกติ)",
+  "Trigger Collector": "สั่งเก็บข้อมูลทันที",
+  "Normal": "ปกติ",
+  "Anomaly": "ผิดปกติ",
+  "Bounce Port": "สั่งรีเซ็ตพอร์ต (Bounce)",
+  "Configure Limit": "จำกัดความเร็ว",
+  "Remove Limit": "ยกเลิกการจำกัด",
+  "Fix": "สั่งรีเซ็ตพอร์ต (Bounce)",
+  "Limit": "จำกัดความเร็ว",
+  "Unlimit": "ยกเลิกการจำกัด",
+  "up": "ทำงาน (up)",
+  "down": "ปิดใช้งาน (down)",
+  
+  // Traffic Analytics Page
+  "Traffic analytics": "การวิเคราะห์ปริมาณข้อมูล",
+  "Network Traffic": "ปริมาณข้อมูลทราฟฟิกเครือข่าย",
+  "Interface utilization trend from the latest collector samples.": "แนวโน้มการใช้งานอินเทอร์เฟซจากตัวอย่างล่าสุดของคอลเลกเตอร์",
+  "Loading traffic...": "กำลังโหลดข้อมูลทราฟฟิก...",
+  "Peak TX": "ปริมาณการส่งออกข้อมูลสูงสุด",
+  "Peak RX": "ปริมาณการรับเข้าข้อมูลสูงสุด",
+  "Average Load": "อัตราการดาวน์โหลดเฉลี่ย",
+  "Devices": "อุปกรณ์เครือข่าย",
+  "Across visible devices": "ของอุปกรณ์เครือข่ายที่พบ",
+  "Last Hour Trend": "แนวโน้มปริมาณข้อมูลย้อนหลัง 1 ชั่วโมง",
+  "All devices": "อุปกรณ์ทั้งหมด",
+  "Both": "ทั้งส่งและรับ (Both)",
+  "Top Utilization": "5 อันดับอัตราการใช้งานสูงสุด",
+  "Latest Snapshot": "ภาพรวมสถานะล่าสุด",
+  "Watch": "เฝ้าระวัง",
+  "High": "สูงมาก",
+  "No traffic data": "ไม่มีข้อมูลทราฟฟิกในขณะนี้",
+  "Collector has not returned traffic samples yet.": "ระบบกำลังคัดกรองข้อมูลเครือข่ายและรอดึงตัวอย่างทราฟฟิก...",
+  "Traffic unavailable": "ไม่สามารถระบุปริมาณข้อมูลได้",
+
+  // Topology Map
+  "Link Details": "รายละเอียดการเชื่อมต่อเครือข่าย",
+  "Backbone Link Details": "รายละเอียดเส้นการเชื่อมต่อหลัก (Backbone Link)",
+  "Link Status": "สถานะลิงก์การเชื่อมต่อ",
+  "Traffic Label": "ป้ายระบุพฤติกรรมข้อมูลทราฟฟิก",
+  "Device Name": "ชื่ออุปกรณ์เครือข่าย",
+  "Role": "บทบาทหน้าที่อุปกรณ์",
+  "Zone": "ขอบเขตการจัดตั้ง (Zone)",
+  "Management Host": "ไอพีแอดเดรสสำหรับจัดการระบบ",
+  "Side": "ฝั่งอุปกรณ์",
+  "Interface": "ช่องอินเทอร์เฟซ",
+  "IP Address": "ไอพีแอดเดรสอินเทอร์เฟซ",
+  "TX Load": "ปริมาณทราฟฟิกฝั่งส่ง (TX Load)",
+  "RX Load": "ปริมาณทราฟฟิกฝั่งรับ (RX Load)",
+  "Fix Port": "สั่งรีเซ็ตพอร์ต (Bounce)",
+  "Click nodes or links to inspect status and execute operations.": "คลิกเลือกอุปกรณ์เครือข่ายหรือสายเชื่อมต่อหลักเพื่อแสดงรายละเอียดและตัวดำเนินการ",
+  "Confirm Port Bounce": "ยืนยันคำสั่ง Bounce พอร์ต",
+  "Are you sure you want to fix interface": "คุณยืนยันที่จะทำการ Bounce พอร์ต",
+  "on": "บนอุปกรณ์",
+  "This will temporarily bounce (shutdown & no shutdown) the port.": "การดำเนินการนี้จะทำการปิดพอร์ตชั่วคราวและเปิดกลับมาใช้งานโดยทันที",
+  "Yes, bounce": "ใช่, สั่ง Bounce",
+  "Configure Rate Limit": "ตั้งค่าจำกัดความเร็ว (Rate Limit)",
+  "Bandwidth Limit (Mbps)": "จำกัดความเร็วสูงสุดที่อนุญาต (Mbps)",
+  "Auto-rollback Time (Minutes)": "รอบเวลารีเซ็ตข้อมูลความเร็วกลับมาปกติอัตโนมัติ (นาที)",
+  "0 for manual removal": "ใส่ค่าเป็น 0 หากต้องการปลดเกณฑ์ความเร็วด้วยตนเอง",
+  "Please enter a valid limit (1-10000 Mbps)": "โปรดระบุค่าความเร็วทราฟฟิกเครือข่ายที่ถูกต้องระหว่าง 1 ถึง 10000 Mbps",
+  "Please enter a valid rollback duration": "โปรดระบุเวลาสำหรับการย้อนกลับพอร์ตให้ถูกต้อง",
+  "Apply Limit": "ยืนยันจำกัดความเร็ว",
+  "eth0": "พอร์ต PC (eth0)",
+  "Vlan1": "พอร์ตเสมือน (Vlan1)",
+  
+  // Config Backups Page
+  "Configuration Backups": "ระบบสำรองข้อมูลอุปกรณ์",
+  "Automated Configuration Backups": "ระบบสำรองไฟล์คอนฟิกอุปกรณ์อัตโนมัติ",
+  "Backup Session Status": "สถานะการสำรองข้อมูลในรอบปัจจุบัน",
+  "Configuration Diff Engine": "เครื่องมือเปรียบเทียบความแตกต่างไฟล์คอนฟิก (Diff)",
+  "Select two backup sessions below and click Compare to view running-config changes over time.": "เลือกสองเซสชันการสำรองข้อมูลด้านล่างแล้วคลิกเปรียบเทียบเพื่อดูการเปลี่ยนแปลงของรันคอนฟิก",
+  "Session A": "ไฟล์สำรองตัวตั้งต้น A",
+  "Session B": "ไฟล์สำรองที่จะเปรียบเทียบ B",
+  "Select Device": "เลือกอุปกรณ์",
+  "Compare": "เปรียบเทียบความต่าง (Diff)",
+  "Historical Backup Sessions": "ประวัติการสำรองไฟล์คอนฟิกย้อนหลัง",
+  "Run Backup Session": "สั่งรันสำรองข้อมูลเดี๋ยวนี้",
+  "ID / TIMESTAMP": "ไอดี / วันเวลาสำรอง",
+  "DEVICES BACKED UP": "จำนวนอุปกรณ์",
+  "TOTAL SIZE": "ขนาดรวม",
+  "DEVICES": "อุปกรณ์",
+  "VIEW FILES": "ดูไฟล์ข้อมูล",
+  "Backing up devices...": "กำลังสำรองข้อมูลอุปกรณ์...",
+  "Backup Now": "เริ่มการสำรองข้อมูลทันที",
+  "Running Configuration Backup...": "ระบบกำลังเริ่มการสำรองข้อมูลอุปกรณ์...",
+  "Initializing connections...": "กำลังสร้างเซสชันการเชื่อมต่ออุปกรณ์...",
+  "Backup Sessions History": "ประวัติไฟล์คอนฟิกที่สำรองย้อนหลัง",
+  "Session / Timestamp": "วันเวลาของเซสชันที่สำรอง",
+  "Devices Saved": "จำนวนอุปกรณ์ที่สำรองสำเร็จ",
+  "View Session": "ดูไฟล์คอนฟิกของเซสชัน",
+  "Backup Session Details": "รายการรายละเอียดไฟล์คอนฟิกและตารางเส้นทาง",
+  "Close Details": "ปิดส่วนรายละเอียด",
+  "File Type": "ประเภทข้อมูลไฟล์",
+  "Filename": "ชื่อไฟล์เอกสาร",
+  "View": "ดูรายละเอียดไฟล์",
+  "Compare (Diff)": "เปรียบเทียบความต่าง (Diff)",
+  "Running Config": "คอนฟิกการรัน (Running-Config)",
+  "Routing Table": "ตารางจัดเส้นทาง (Routing Table)",
+  "View Config": "การเปิดอ่านไฟล์คอนฟิก",
+  "Git-style Config Diff Comparison": "เครื่องมือตรวจสอบความต่างของไฟล์คอนฟิก (Diff)",
+  "Comparing files...": "กำลังประมวลผลเปรียบเทียบไฟล์ข้อมูล...",
+  "No changes detected. The configurations are identical.": "ไม่พบการเปลี่ยนแปลงใดๆ ไฟล์ข้อมูลคอนฟิกมีความสอดคล้องตรงกันทุกบรรทัด",
+  "No other historical backup sessions containing": "ไม่พบประวัติไฟล์สำรองอื่นๆ ของอุปกรณ์",
+  "to compare with!": "เพื่อเปรียบเทียบ!",
+  "Select a version of": "เลือกรอบการสำรองข้อมูลของ",
+  "config to compare with": "เพื่อใช้เปรียบเทียบความต่างกับ",
+  "Select Backup Version": "เลือกรอบไฟล์สำรองที่ต้องการใช้",
+  "You must select a backup version!": "คุณต้องเลือกรอบไฟล์สำรองอย่างน้อยหนึ่งรอบ!",
+  "Backup session initiated": "ระบบได้ส่งคำสั่งสำรองข้อมูลเข้าระบบหลักแล้ว",
+  "Configuration backup successfully completed!": "ระบบได้ดำเนินการสำรองข้อมูลเสร็จสิ้นเรียบร้อยแล้ว!",
+  "Backup failed. Check connection parameters.": "เกิดข้อผิดพลาดในการสำรองข้อมูล โปรดตรวจสอบค่าพารามิเตอร์การเชื่อมต่อ",
+  
+  // Settings Page
+  "General": "ทั่วไป",
+  "AI Model": "ระบบสมองกล AI",
+  "Devices": "อุปกรณ์เครือข่าย",
+  "Environment": "ระบบสภาพแวดล้อม (.env)",
+  "Users": "ผู้ใช้งานระบบ",
+  "Collector & Data": "ข้อมูลและการเก็บค่าพารามิเตอร์",
+  "INTERVAL (SECONDS)": "รอบเวลาสแกนข้อมูล (วินาที)",
+  "RETENTION (DAYS)": "ระยะเวลาเก็บรักษาข้อมูลเก่า (วัน)",
+  "Interval (seconds)": "รอบเวลาสแกนข้อมูล (วินาที)",
+  "Retention (days)": "ระยะเวลาการจัดเก็บข้อมูล (วัน)",
+  "AI Model Thresholds": "ขีดจำกัดตรรกะระบบ AI",
+  "LOAD (0-255)": "ปริมาณทราฟฟิกสูงสุด (0-255)",
+  "RELIABILITY (0-255)": "ความเสถียรขั้นต่ำ (0-255)",
+  "Load (0-255)": "ปริมาณทราฟฟิกสูงสุด (0-255)",
+  "Reliability (0-255)": "ความเสถียรขั้นต่ำ (0-255)",
+  "ERRORS": "จำนวนข้อผิดพลาดสูงสุด",
+  "Errors": "จำนวนข้อผิดพลาดสูงสุด (Errors)",
+  "Link Type Rules": "กฎการแยกประเภทลิงก์เครือข่าย",
+  "Subnet Prefix (เช่น 10.10.)": "หมายเลขซับเน็ตเริ่มต้น (เช่น 10.10.)",
+  "Link Type (เช่น Core)": "ประเภทการเชื่อมโยง (เช่น Core)",
+  "Action": "ตัวดำเนินการ",
+  "Add Rule": "เพิ่มกฎการแยกประเภท",
+  "Default Link Type": "ประเภทการเชื่อมโยงเริ่มต้น",
+  "Ignored Interfaces (Skip Types)": "อินเทอร์เฟซที่ระบบละเว้น (Skip Types)",
+  "Save General Settings": "บันทึกข้อมูลทั่วไปทั้งหมด",
+  "Retrain Workflow": "ระบบเทรนข้อมูลแบบจำลอง AI",
+  "Model Version": "รุ่นเวอร์ชันของแบบจำลอง AI",
+  "Model Status": "สถานะความพร้อมแบบจำลอง AI",
+  "Training Rows": "จำนวนชุดข้อมูลสถิติที่ป้อนเรียนรู้",
+  "Features": "มิติคุณสมบัติข้อมูลนำเข้า (Features)",
+  "Precision": "ความแม่นยำรวมของ AI (Precision)",
+  "Recall": "ความครอบคลุมการตรวจสอบ (Recall)",
+  "False Positive Rate": "อัตราเตือนหลอกผิดพลาด (FPR)",
+  "Supported Vendors": "แบรนด์อุปกรณ์ที่รองรับในขณะนี้",
+  "Retrain Model": "เริ่มเทรนแบบจำลอง AI ทันที",
+  "Retrain Log": "บันทึกรายงานขั้นตอนการเทรน AI",
+  "No retrain has run in this dashboard session.": "ยังไม่มีการรันระบบเทรนแบบจำลอง AI ในเซสชันนี้",
+  "Network Devices": "รายการพารามิเตอร์ของอุปกรณ์ทั้งหมด",
+  "Add Device": "เพิ่มอุปกรณ์เครือข่าย",
+  "Name": "ชื่ออุปกรณ์",
+  "Host/IP": "หมายเลขไอพีแอดเดรส",
+  "Type": "ระบบปฏิบัติการอุปกรณ์",
+  "Role": "บทบาทหน้าที่",
+  "Zone": "พื้นที่ / เขตการเชื่อมต่อ",
+  "SNMP Community": "รหัสผ่าน SNMP Community",
+  "Edit": "แก้ไข",
+  "Delete": "ลบอุปกรณ์",
+  "Add Network Device": "เพิ่มรายละเอียดอุปกรณ์เครือข่าย",
+  "Edit Network Device": "แก้ไขข้อมูลอุปกรณ์เครือข่าย",
+  "Device Name": "ชื่อเรียกอุปกรณ์",
+  "Host IP Address": "หมายเลขไอพีหลัก",
+  "Device Type": "ประเภทระบบปฏิบัติการ",
+  "Zone / Location": "โซนหรือสถานที่ตั้ง",
+  "Save Device": "บันทึกข้อมูลอุปกรณ์",
+  "Environment Variables (.env)": "รายการค่าคอนฟิกสภาพแวดล้อม (.env)",
+  "Secret values are never shown after save. Leave a secret field empty to keep the current value. Restart the app after changes.": "ค่ารหัสลับทั้งหมดจะไม่ถูกดึงมาแสดงบนหน้าจอ หากไม่ต้องการแก้ไขข้อมูลความปลอดภัยส่วนนี้ ให้เว้นว่างช่องรหัสไว้และระบบจะคงรหัสเดิม และโปรดรีสตาร์ตระบบหลักหลังทำการบันทึกทุกครั้ง",
+  "Discord Bot Token": "โทเค็นสำหรับบอต Discord",
+  "Discord Channel ID": "หมายเลขไอดีแชนเนล Discord",
+  "Device Username": "ชื่อผู้ใช้หลักของอุปกรณ์",
+  "Device Password": "รหัสผ่านหลัก of อุปกรณ์",
+  "Enable Secret": "รหัสผ่านสำหรับการยืนยันตัวตนสิทธิ์สูง (Enable)",
+  "SNMPv3 Username": "ชื่อผู้ใช้ระบบความปลอดภัย SNMPv3",
+  "SNMPv3 Auth Password": "รหัสรับรองการเข้าใช้งาน SNMPv3 Auth",
+  "SNMPv3 Privacy Password": "รหัสผ่านการเข้ารหัสแพ็กเก็ต SNMPv3 Privacy",
+  "Save Environment": "บันทึกค่าระบบหลัก",
+  "Create New User": "สร้างบัญชีผู้ใช้งานระบบรายใหม่",
+  "Username": "ชื่อผู้ใช้งานระบบ",
+  "Password": "รหัสผ่านเข้าใช้งาน",
+  "Create User": "สร้างผู้ใช้รายใหม่",
+  "All Users": "ผู้ใช้งานที่ได้รับอนุญาตทั้งหมด",
+  "ID": "รหัสไอดี",
+  "Created": "วันที่ลงทะเบียนสำเร็จ",
+  "Role updated": "อัปเดตบทบาทผู้ใช้งานสำเร็จ",
+  "Environment saved": "บันทึกสภาพแวดล้อมความปลอดภัยลงในระบบสำเร็จ",
+  "Config saved": "บันทึกค่าคอนฟิกอุปกรณ์สำเร็จ",
+  "Raw devices JSON saved": "บันทึกไฟล์สถิติอุปกรณ์ฉบับดิบสำเร็จ",
+  "Yes, delete": "ใช่, ต้องการลบ",
+  "Cancel": "ยกเลิก",
+
+  // Alerts & Loading Widget
+  "Confirm Port Bounce": "ยืนยันการสั่ง Bounce พอร์ต",
+  "Bouncing Port...": "กำลัง Bounce พอร์ต...",
+  "Applying Rate Limit...": "กำลังจำกัดแบนด์วิดท์...",
+  "Removing Rate Limit...": "กำลังยกเลิกการจำกัดแบนด์วิดท์...",
+  "Please wait, GNS3 devices may take up to 15 seconds to apply.": "โปรดรอสักครู่ อุปกรณ์จำลองใน GNS3 อาจใช้เวลาสูงสุด 15 วินาทีในการรันตรรกะ",
+  "Executing port bounce...": "กำลังรีเซ็ตพอร์ต...",
+  "Connection successful": "เชื่อมต่อสำเร็จ",
+  "Operation successful": "การทำงานสำเร็จลุล่วง",
+  
+  // Extra elements found in settings tabs and buttons
+  "Interval": "รอบสแกนข้อมูล",
+  "Retention": "ระยะเวลาเก็บข้อมูล"
+};
+
+// Global translation utilities
+RemediationManager.getTranslation = function(text) {
+  const lang = localStorage.getItem('netsentinel_lang') || 'en';
+  if (lang === 'en') return text;
+  return TH_DICT[text] || text;
+};
+
+RemediationManager.translatePage = function() {
+  const lang = localStorage.getItem('netsentinel_lang') || 'en';
+  
+  // Update toggle button text dynamically
+  const textBtn = document.getElementById('lang-toggle-text');
+  if (textBtn) {
+    textBtn.textContent = lang === 'en' ? 'English / ไทย' : 'ภาษาไทย / EN';
+  }
+  
+  // Translate standard text containers
+  const elements = document.querySelectorAll('span, h1, h2, h3, h4, a, button, label, th, td, option');
+  elements.forEach(el => {
+    if (el.closest('.remediation-progress-card') || el.closest('.swal2-container')) return;
+    
+    const text = el.textContent ? el.textContent.trim() : '';
+    if (!text) return;
+    
+    let origText = el.getAttribute('data-orig-en');
+    if (!origText) {
+      origText = text;
+      el.setAttribute('data-orig-en', origText);
+    }
+    
+    const translated = this.getTranslation(origText);
+    if (translated && translated !== origText) {
+      if (el.children.length === 0) {
+        el.textContent = translated;
+      } else {
+        // Translate only direct text nodes, preserving SVG/HTML children
+        for (let node of el.childNodes) {
+          if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() === origText) {
+            node.nodeValue = translated;
+          }
+        }
+      }
+    } else if (lang === 'en' && origText) {
+      // Revert to English if user switched to English
+      if (el.children.length === 0) {
+        el.textContent = origText;
+      } else {
+        for (let node of el.childNodes) {
+          if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() === translated) {
+            node.nodeValue = origText;
+          }
+        }
+      }
+    }
+  });
+
+  // Translate input placeholders
+  const inputs = document.querySelectorAll('input[placeholder]');
+  inputs.forEach(el => {
+    let origText = el.getAttribute('data-orig-placeholder');
+    if (!origText) {
+      origText = el.getAttribute('placeholder');
+      el.setAttribute('data-orig-placeholder', origText);
+    }
+    const translated = this.getTranslation(origText);
+    if (translated) {
+      el.setAttribute('placeholder', translated);
+    }
+  });
+};
+
+window.toggleLanguage = function() {
+  const current = localStorage.getItem('netsentinel_lang') || 'en';
+  const next = current === 'en' ? 'th' : 'en';
+  localStorage.setItem('netsentinel_lang', next);
+  
+  // Re-observe setup
+  window.translationObserver.disconnect();
+  RemediationManager.translatePage();
+  window.translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+};
+
+// Setup dynamic MutationObserver to auto-translate dynamic DOM renders (like Ajax tables)
+window.translationObserver = new MutationObserver((mutations) => {
+  window.translationObserver.disconnect();
+  RemediationManager.translatePage();
+  window.translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+});
+
+// Run initialization
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => RemediationManager.init());
+} else {
+  RemediationManager.init();
 }
 </script>
