@@ -52,11 +52,13 @@
   padding: 0 !important;
   overflow: hidden;
   min-height: auto;
+  border-color: var(--brd);
 }
 
 .ai-ws-header {
-  padding: 1.25rem 1.25rem 0.75rem;
+  padding: 1.1rem 1.25rem 0.8rem;
   border-bottom: 1px solid var(--brd-soft);
+  background: linear-gradient(180deg, rgba(124,58,237,0.06), transparent);
 }
 
 .ai-ws-header h3 {
@@ -76,13 +78,14 @@
 .ai-ws-hint {
   font-size: var(--text-sm, 0.8125rem);
   color: var(--txt-m);
-  padding: 0.75rem 1.25rem;
+  padding: 0.7rem 1.25rem;
   line-height: 1.5;
   border-bottom: 1px solid var(--brd-soft);
+  font-family: ui-monospace, 'Cascadia Code', monospace;
 }
 
 .ai-chat-feed {
-  padding: 1rem 1.25rem;
+  padding: 1rem 1.25rem 0.5rem;
   min-height: 0;
   max-height: none;
 }
@@ -99,6 +102,7 @@
   background: var(--panel-2);
   border: 1px solid var(--brd-soft);
   color: var(--txt-m);
+  max-width: 720px;
 }
 
 .ai-bubble-label {
@@ -109,7 +113,7 @@
 }
 
 .ai-composer {
-  padding: 1rem 1.25rem 1.25rem;
+  padding: 0.75rem 1.25rem 1.25rem;
   border-top: 1px solid var(--brd-soft);
 }
 
@@ -159,6 +163,8 @@
   display: grid;
   place-items: center;
   flex-shrink: 0;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(124,58,237,0.22);
 }
 
 .ai-send-btn:hover {
@@ -227,13 +233,18 @@
 }
 
 .logs-page .grid-layout {
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: minmax(0, 1.55fr) minmax(340px, 0.95fr);
   gap: 1.25rem;
+  align-items: start;
 }
 
 .logs-page .card {
   padding: 1.25rem;
   box-shadow: none;
+}
+
+.logs-page .card:first-of-type {
+  min-width: 0;
 }
 
 .logs-page .card h3 {
@@ -244,6 +255,8 @@
 .logs-page .tools {
   gap: 0.5rem;
   margin-bottom: 1rem;
+  display: grid;
+  grid-template-columns: minmax(135px, auto) minmax(150px, auto) minmax(220px, 1fr) auto;
 }
 
 .logs-page .select,
@@ -251,6 +264,7 @@
   height: 36px;
   font-size: var(--text-sm, 0.8125rem);
   border-radius: var(--ai-radius-sm);
+  min-width: 0;
 }
 
 .logs-page .btn {
@@ -282,6 +296,19 @@
 
 .logs-page .table-wrap {
   border-radius: var(--ai-radius-sm);
+  max-height: 420px;
+  overflow: auto;
+}
+
+.logs-page thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--card);
+}
+
+.logs-page tbody tr:hover {
+  background: var(--panel-2);
 }
 
 /* Dashboard feed */
@@ -317,8 +344,17 @@
   .logs-page .grid-layout {
     grid-template-columns: 1fr;
   }
+  .logs-page .tools {
+    grid-template-columns: 1fr 1fr;
+  }
   .ns-main,
   .logs-page .main {
     padding: 1.25rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .logs-page .tools {
+    grid-template-columns: 1fr;
   }
 }

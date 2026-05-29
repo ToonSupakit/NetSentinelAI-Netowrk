@@ -20,6 +20,15 @@ logs/
 *.log
 netsentinel.db
 
+# Runtime/generated data
+backups/
+memory/
+scratch/*.txt
+scratch/*.py
+scratch/*_run.txt
+scratch/*_route.txt
+scratch/*show*.txt
+
 # IDE
 .vscode/
 .idea/

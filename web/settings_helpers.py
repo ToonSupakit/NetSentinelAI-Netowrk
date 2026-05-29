@@ -14,6 +14,12 @@ ENV_KEYS = frozenset(
         "SNMP_V3_USER",
         "SNMP_V3_AUTH",
         "SNMP_V3_PRIV",
+        "FLASK_SECRET",
+        "APP_ENV",
+        "SESSION_COOKIE_SECURE",
+        "DASHBOARD_HOST",
+        "DASHBOARD_PORT",
+        "SOCKETIO_CORS_ORIGINS",
     }
 )
 ENV_SECRET_KEYS = frozenset(
@@ -24,6 +30,7 @@ ENV_SECRET_KEYS = frozenset(
         "SNMP_COMMUNITY",
         "SNMP_V3_AUTH",
         "SNMP_V3_PRIV",
+        "FLASK_SECRET",
     }
 )
 
@@ -110,6 +117,14 @@ def validate_env_payload(data):
             return False, f"{key} is too long"
         if key == "DISCORD_CHANNEL_ID" and text.strip() and not text.strip().isdigit():
             return False, "DISCORD_CHANNEL_ID must be numeric"
+        if key == "DASHBOARD_PORT" and text.strip() and not text.strip().isdigit():
+            return False, "DASHBOARD_PORT must be numeric"
+        if key == "SESSION_COOKIE_SECURE" and text.strip().lower() not in {"1", "0", "true", "false", "yes", "no", "on", "off"}:
+            return False, "SESSION_COOKIE_SECURE must be true or false"
+        if key == "APP_ENV" and text.strip() and text.strip().lower() not in {"development", "dev", "production", "prod", "test"}:
+            return False, "APP_ENV must be development, test, or production"
+        if key == "FLASK_SECRET" and text.strip() and len(text.strip()) < 32:
+            return False, "FLASK_SECRET must be at least 32 characters"
     return True, None
 
 

@@ -6,6 +6,7 @@ import os
 from datetime import datetime
 from app.db import get_anomaly_history, get_device_status, mark_as_fixed, get_analytics
 from app.runtime import shutdown_event
+from app.security import device_credential
 from app.vendor_adapters import remediation_commands
 from netmiko import ConnectHandler
 from dotenv import load_dotenv
@@ -40,9 +41,9 @@ def get_device_conn_params(device):
     return {
         "device_type": device["device_type"],
         "host": device["host"],
-        "username": device.get("username") or os.getenv("DEVICE_USERNAME", "admin"),
-        "password": device.get("password") or os.getenv("DEVICE_PASSWORD", "admin"),
-        "secret": device.get("secret") or os.getenv("DEVICE_SECRET", "admin"),
+        "username": device_credential(device, "username", "DEVICE_USERNAME"),
+        "password": device_credential(device, "password", "DEVICE_PASSWORD"),
+        "secret": device_credential(device, "secret", "DEVICE_SECRET"),
     }
 
 

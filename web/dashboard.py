@@ -23,6 +23,7 @@ from web.api_serializers import (
     serialize_traffic_rows,
 )
 from web.remediation_helpers import parse_rate_limit_payload
+from app.security import DEFAULT_FLASK_SECRET, device_credential, is_production, runtime_secret
 from web.settings_helpers import (
     ENV_SECRET_KEYS,
     env_nonempty as _env_nonempty,
@@ -52,20 +53,28 @@ with open("config/config.yaml", "r", encoding="utf-8") as f:
 with open("config/devices.yaml", "r", encoding="utf-8") as f:
     devices_config = yaml.safe_load(f)
 
-# Dashboard credentials จาก .env (ใช้เป็น default ตอน seed เท่านั้น)
+def _truthy_env(key):
+    return os.getenv(key, "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _socketio_cors_origins():
+    raw = os.getenv("SOCKETIO_CORS_ORIGINS", "").strip()
+    if not raw:
+        return None
+    return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET", "netsentinel-secret-key-change-me")
+app.config["SECRET_KEY"] = runtime_secret("FLASK_SECRET", DEFAULT_FLASK_SECRET)
 app.config["PERMANENT_SESSION_LIFETIME"] = 3600 * 8  # 8 ชั่วโมง
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "").lower() in (
-    "1",
-    "true",
-    "yes",
-    "on",
-) or os.getenv("APP_ENV", "").lower() in ("prod", "production")
-socketio = SocketIO(app, cors_allowed_origins="*")
+app.config["SESSION_COOKIE_SECURE"] = _truthy_env("SESSION_COOKIE_SECURE") or is_production()
+app.config["SESSION_COOKIE_NAME"] = os.getenv(
+    "SESSION_COOKIE_NAME",
+    "__Host-netsentinel-session" if app.config["SESSION_COOKIE_SECURE"] else "netsentinel_session",
+)
+socketio = SocketIO(app, cors_allowed_origins=_socketio_cors_origins())
 
 ENV_PATH = os.getenv("NETSENTINEL_ENV_PATH", ".env")
 
@@ -105,6 +114,27 @@ def get_csrf_token():
 @app.context_processor
 def _inject_csrf_token():
     return {"csrf_token": get_csrf_token}
+
+
+@app.after_request
+def _security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self' ws: wss:; "
+        "object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+    )
+    if app.config.get("SESSION_COOKIE_SECURE"):
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return response
 
 
 def audit_log(action, success=True, details=None):
@@ -244,9 +274,9 @@ def get_device_conn_params(device):
     return {
         "device_type": device["device_type"],
         "host": device["host"],
-        "username": device.get("username") or os.getenv("DEVICE_USERNAME", "admin"),
-        "password": device.get("password") or os.getenv("DEVICE_PASSWORD", "admin"),
-        "secret": device.get("secret") or os.getenv("DEVICE_SECRET", "admin"),
+        "username": device_credential(device, "username", "DEVICE_USERNAME"),
+        "password": device_credential(device, "password", "DEVICE_PASSWORD"),
+        "secret": device_credential(device, "secret", "DEVICE_SECRET"),
     }
 
 
@@ -361,6 +391,7 @@ def api_get_syslogs():
     device = request.args.get("device", "all")
     severity = request.args.get("severity", "all")
     search = request.args.get("search", "")
+    lang = request.args.get("lang", "th")
     
     query = "SELECT device_name, ip_address, facility, severity, mnemonic, message, ai_cause, ai_suggestion, received_at FROM device_syslogs WHERE 1=1"
     params = {}
@@ -381,7 +412,13 @@ def api_get_syslogs():
         with engine.connect() as conn:
             rows = conn.execute(text(query), params).fetchall()
             logs = []
+            if lang == "en":
+                from app.syslog_server import analyze_syslog_ai
             for r in rows:
+                ai_cause = r[6]
+                ai_suggestion = r[7]
+                if lang == "en":
+                    ai_cause, ai_suggestion = analyze_syslog_ai(r[2], r[4], r[5], lang="en")
                 logs.append({
                     "device_name": r[0],
                     "ip_address": r[1],
@@ -389,8 +426,8 @@ def api_get_syslogs():
                     "severity": r[3],
                     "mnemonic": r[4],
                     "message": r[5],
-                    "ai_cause": r[6],
-                    "ai_suggestion": r[7],
+                    "ai_cause": ai_cause,
+                    "ai_suggestion": ai_suggestion,
                     "received_at": r[8].strftime("%Y-%m-%d %H:%M:%S") if r[8] else ""
                 })
             return jsonify({"success": True, "logs": logs})
@@ -420,7 +457,8 @@ def api_analyze_syslog_ondemand():
         message = cisco_match.group(4).strip()
         
     from app.syslog_server import analyze_syslog_ai
-    ai_cause, ai_suggestion = analyze_syslog_ai(facility, mnemonic, message)
+    lang = request.args.get("lang", "th")
+    ai_cause, ai_suggestion = analyze_syslog_ai(facility, mnemonic, message, lang=lang)
     
     return jsonify({
         "success": True,
@@ -665,9 +703,10 @@ def run_backup_worker():
             backup_status["log"].append("No devices configured in devices.yaml!")
             return
             
-        username = os.getenv("DEVICE_USERNAME", "admin")
-        password = os.getenv("DEVICE_PASSWORD", "admin")
-        secret = os.getenv("DEVICE_SECRET", "admin")
+        default_creds = {"name": "backup-defaults", "host": "backup-defaults"}
+        username = device_credential(default_creds, "username", "DEVICE_USERNAME")
+        password = device_credential(default_creds, "password", "DEVICE_PASSWORD")
+        secret = device_credential(default_creds, "secret", "DEVICE_SECRET")
         
         total = len(devices)
         success_count = 0
@@ -1449,12 +1488,18 @@ def api_get_env():
                 "DISCORD_CHANNEL_ID": os.getenv("DISCORD_CHANNEL_ID", ""),
                 "DEVICE_USERNAME": os.getenv("DEVICE_USERNAME", ""),
                 "SNMP_V3_USER": os.getenv("SNMP_V3_USER", ""),
+                "APP_ENV": os.getenv("APP_ENV", ""),
+                "SESSION_COOKIE_SECURE": os.getenv("SESSION_COOKIE_SECURE", ""),
+                "DASHBOARD_HOST": os.getenv("DASHBOARD_HOST", ""),
+                "DASHBOARD_PORT": os.getenv("DASHBOARD_PORT", ""),
+                "SOCKETIO_CORS_ORIGINS": os.getenv("SOCKETIO_CORS_ORIGINS", ""),
                 "DISCORD_TOKEN_CONFIGURED": _env_nonempty("DISCORD_TOKEN"),
                 "DEVICE_PASSWORD_CONFIGURED": _env_nonempty("DEVICE_PASSWORD"),
                 "DEVICE_SECRET_CONFIGURED": _env_nonempty("DEVICE_SECRET"),
                 "SNMP_COMMUNITY_CONFIGURED": _env_nonempty("SNMP_COMMUNITY"),
                 "SNMP_V3_AUTH_CONFIGURED": _env_nonempty("SNMP_V3_AUTH"),
                 "SNMP_V3_PRIV_CONFIGURED": _env_nonempty("SNMP_V3_PRIV"),
+                "FLASK_SECRET_CONFIGURED": _env_nonempty("FLASK_SECRET"),
             },
         }
     )
@@ -1555,5 +1600,15 @@ def push_device_down(info):
 
 
 def run_dashboard():
-    log.info("Dashboard starting on http://0.0.0.0:5000")
-    socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, log_output=False, allow_unsafe_werkzeug=True)
+    host = os.getenv("DASHBOARD_HOST", "0.0.0.0")
+    port = int(os.getenv("DASHBOARD_PORT", "5000"))
+    log.info("Dashboard starting on http://%s:%s", host, port)
+    socketio.run(
+        app,
+        host=host,
+        port=port,
+        debug=False,
+        use_reloader=False,
+        log_output=False,
+        allow_unsafe_werkzeug=not is_production(),
+    )

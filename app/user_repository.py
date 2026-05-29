@@ -5,6 +5,7 @@ import os
 
 import bcrypt
 from sqlalchemy import text
+from app.security import is_production
 
 log = logging.getLogger(__name__)
 
@@ -14,8 +15,15 @@ def seed_default_admin(engine):
         with engine.connect() as conn:
             count = conn.execute(text("SELECT COUNT(*) FROM users")).scalar()
             if count == 0:
-                default_user = os.getenv("DASH_USER", "admin")
+                default_user = os.getenv("DASH_USER", "admin").strip()
                 default_pass = os.getenv("DASH_PASS", "admin123")
+                if is_production() and (
+                    not os.getenv("DASH_USER")
+                    or not os.getenv("DASH_PASS")
+                    or default_pass.strip().lower() in {"admin", "admin123", "password", "changeme"}
+                    or len(default_pass) < 12
+                ):
+                    raise RuntimeError("DASH_USER and a strong DASH_PASS are required for production admin seeding")
                 hashed = bcrypt.hashpw(default_pass.encode(), bcrypt.gensalt()).decode()
                 conn.execute(
                     text("INSERT INTO users (username, password, role) VALUES (:u, :p, 'admin')"),

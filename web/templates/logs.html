@@ -267,7 +267,7 @@ R2(config)# service timestamps log datetime msec</pre>
           <option value="Informational">Informational</option>
           <option value="Debug">Debug</option>
         </select>
-        <input type="text" class="input" id="search-log" placeholder="ค้นหา log…" oninput="fetchSyslogs()">
+        <input type="text" class="input" id="search-log" placeholder="Search logs..." oninput="fetchSyslogs()">
         <button class="btn btn-secondary" onclick="clearFilters()">Reset</button>
       </div>
 
@@ -296,19 +296,19 @@ R2(config)# service timestamps log datetime msec</pre>
     <div class="card ai-workspace">
       <div class="ai-ws-header">
         <h3>AI Log Analyzer</h3>
-        <p>วาง syslog แล้วกดส่ง — ระบบจะอธิบายสาเหตุและวิธีแก้</p>
+        <p>Paste a syslog and send it. The system will explain the likely cause and fix.</p>
       </div>
-      <p class="ai-ws-hint">ตัวอย่าง: %LINK-3-UPDOWN, %OSPF-5-ADJCHG</p>
+      <p class="ai-ws-hint">Example: %LINK-3-UPDOWN, %OSPF-5-ADJCHG</p>
       <div class="ai-chat-feed" id="ai-chat-feed" aria-live="polite">
         <div class="ai-bubble ai-bubble-system">
-          <div class="ai-bubble-label">คำแนะนำ</div>
-          วางข้อความ log ด้านล่าง แล้วกดปุ่มส่งเพื่อวิเคราะห์
+          <div class="ai-bubble-label">Tip</div>
+          Paste a log message below, then send it for analysis.
         </div>
       </div>
       <div class="ai-composer">
         <div class="ai-composer-inner">
-          <textarea class="sandbox-textarea ai-composer-input" id="sandbox-input" placeholder="วาง syslog ที่นี่…" rows="3"></textarea>
-          <button type="button" class="ai-send-btn" onclick="runSandboxAnalysis()" aria-label="วิเคราะห์ log" title="ส่งวิเคราะห์">
+          <textarea class="sandbox-textarea ai-composer-input" id="sandbox-input" placeholder="Paste syslog here..." rows="3"></textarea>
+          <button type="button" class="ai-send-btn" onclick="runSandboxAnalysis()" aria-label="Analyze log" title="Send for analysis">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>
@@ -328,15 +328,15 @@ R2(config)# service timestamps log datetime msec</pre>
     </div>
     <div class="modal-body">
       <div class="modal-field modal-field-log">
-        <div class="modal-field-title">Log ต้นฉบับ</div>
+        <div class="modal-field-title">Original Log</div>
         <div class="modal-field-content" id="insight-log-entry" style="font-family:ui-monospace,monospace;font-size:0.8125rem;"></div>
       </div>
       <div class="modal-field modal-field-cause">
-        <div class="modal-field-title">สาเหตุ</div>
+        <div class="modal-field-title">Cause</div>
         <div class="modal-field-content" id="insight-ai-cause"></div>
       </div>
       <div class="modal-field modal-field-fix">
-        <div class="modal-field-title">วิธีแก้ไข</div>
+        <div class="modal-field-title">Recommended Fix</div>
         <div class="modal-field-content" id="insight-ai-suggestion"></div>
       </div>
     </div>
@@ -461,9 +461,10 @@ async function fetchSyslogs() {
   const device = document.getElementById('filter-device').value;
   const severity = document.getElementById('filter-severity').value;
   const search = document.getElementById('search-log').value;
+  const lang = window.NetSentinelI18n?.currentLang || localStorage.getItem('netsentinel_lang') || 'en';
 
   try {
-    const r = await fetch(`/api/syslogs?device=${encodeURIComponent(device)}&severity=${encodeURIComponent(severity)}&search=${encodeURIComponent(search)}`);
+    const r = await fetch(`/api/syslogs?device=${encodeURIComponent(device)}&severity=${encodeURIComponent(severity)}&search=${encodeURIComponent(search)}&lang=${encodeURIComponent(lang)}`);
     const d = await r.json();
     if (!d.success) throw new Error(d.message);
     
@@ -479,7 +480,8 @@ function renderLogsTable(logs) {
   tbody.innerHTML = '';
   
   if (logs.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--txt-m); padding: 2rem;">No logs found matching filters.</td></tr>';
+    const emptyText = window.NetSentinelI18n?.translate('No logs found matching filters.') || 'No logs found matching filters.';
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--txt-m); padding: 2rem;">${emptyText}</td></tr>`;
     return;
   }
 
@@ -546,8 +548,11 @@ function clearFilters() {
 function showInsightModal(logEntry) {
   document.getElementById('insight-modal-title').textContent = `${logEntry.device_name} — Log Diagnostics`;
   document.getElementById('insight-log-entry').textContent = `%${logEntry.facility}-${logEntry.severity.toUpperCase()}-${logEntry.mnemonic}: ${logEntry.message}`;
-  document.getElementById('insight-ai-cause').textContent = logEntry.ai_cause || "ไม่พบสาเหตุผิดปกติพิเศษ";
-  document.getElementById('insight-ai-suggestion').textContent = logEntry.ai_suggestion || "ตรวจสอบสภาพการเชื่อมต่อปกติ";
+  const lang = window.NetSentinelI18n?.currentLang || localStorage.getItem('netsentinel_lang') || 'en';
+  const cause = lang === 'en' ? (logEntry.ai_cause_en || logEntry.ai_cause) : logEntry.ai_cause;
+  const suggestion = lang === 'en' ? (logEntry.ai_suggestion_en || logEntry.ai_suggestion) : logEntry.ai_suggestion;
+  document.getElementById('insight-ai-cause').textContent = cause || "No unusual cause was detected.";
+  document.getElementById('insight-ai-suggestion').textContent = suggestion || "Check the link state and recent device events.";
   showModal('insight-modal');
 }
 
@@ -580,7 +585,8 @@ async function runSandboxAnalysis() {
   });
 
   try {
-    const r = await fetch('/api/syslogs/analyze', {
+    const lang = window.NetSentinelI18n?.currentLang || localStorage.getItem('netsentinel_lang') || 'en';
+    const r = await fetch(`/api/syslogs/analyze?lang=${encodeURIComponent(lang)}`, {
       method: 'POST',
       headers: csrfHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ log_text: textInput })
@@ -757,6 +763,10 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchSyslogs();
   refreshSyslogStatus();
   startStatusAutoRefresh();
+});
+
+document.addEventListener('languagechanged', () => {
+  fetchSyslogs();
 });
 </script>
 </body>

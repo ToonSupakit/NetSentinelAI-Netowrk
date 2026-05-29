@@ -48,6 +48,45 @@ CISCO_MNEMONICS_TH = {
     }
 }
 
+CISCO_MNEMONICS_EN = {
+    "LINK": {
+        "CHANGED": (
+            "The physical interface changed state. Common causes include a disconnected cable, a powered-off peer device, or an administratively shut down port.",
+            "1. Check the physical cable and transceiver at the port\n2. Verify power and link state on the peer device\n3. Run 'no shutdown' on the interface if it was disabled intentionally"
+        )
+    },
+    "LINEPROTO": {
+        "UPDOWN": (
+            "The line protocol changed state. This usually follows a physical link change or a mismatch in interface configuration.",
+            "1. Check the physical link state\n2. Verify encapsulation settings on both ends\n3. Confirm VLAN and access/trunk mode match on both sides"
+        )
+    },
+    "OSPF": {
+        "ADJCHG": (
+            "The OSPF neighbor adjacency changed state, such as a neighbor going down or re-forming.",
+            "1. Verify IP reachability to the neighbor\n2. Check Hello/Dead timers, Area ID, and subnet mask on both sides\n3. Make sure firewall or ACL rules are not blocking OSPF multicast packets"
+        )
+    },
+    "SYS": {
+        "CONFIG_I": (
+            "The device configuration was changed through a terminal or console session.",
+            "1. Confirm whether the change was expected\n2. Review command and audit history for risk\n3. Run a fresh configuration backup so the latest running config is captured"
+        )
+    },
+    "SEC": {
+        "IPACCESSLOGP": (
+            "A packet matched an Access Control List security policy and was logged or blocked.",
+            "1. Review the source IP for scanning or unauthorized access attempts\n2. Check whether the ACL is too strict and blocking normal traffic"
+        )
+    },
+    "IP": {
+        "DUPADDR": (
+            "A duplicate IP address was detected on the network, which can break connectivity for devices using that address.",
+            "1. Find the MAC address using the duplicate IP\n2. Locate the switch port connected to that MAC address\n3. Assign a unique IP address to the conflicting device"
+        )
+    }
+}
+
 SEVERITIES = {
     0: "Emergency",
     1: "Alert",
@@ -59,35 +98,51 @@ SEVERITIES = {
     7: "Debug"
 }
 
-def analyze_syslog_ai(facility, mnemonic, message):
-    """Analyze the syslog entry using a heuristic lookup to generate detailed Thai root causes and recommendations."""
+def analyze_syslog_ai(facility, mnemonic, message, lang="th"):
+    """Analyze the syslog entry using a heuristic lookup in Thai or English."""
     fac = (facility or "").upper()
     mnem = (mnemonic or "").upper()
+    lookup = CISCO_MNEMONICS_EN if lang == "en" else CISCO_MNEMONICS_TH
     
     # Check if mnemonic exists in dictionary
-    if fac in CISCO_MNEMONICS_TH and mnem in CISCO_MNEMONICS_TH[fac]:
-        return CISCO_MNEMONICS_TH[fac][mnem]
+    if fac in lookup and mnem in lookup[fac]:
+        return lookup[fac][mnem]
     
     # Check general mnemonic fallback
-    for f_key, mnems in CISCO_MNEMONICS_TH.items():
+    for f_key, mnems in lookup.items():
         if mnem in mnems:
             return mnems[mnem]
             
     # Generic fallback based on key terms
     msg_upper = message.upper()
     if "DUPLICATE" in msg_upper or "DUP" in msg_upper:
-        return CISCO_MNEMONICS_TH["IP"]["DUPADDR"]
+        return lookup["IP"]["DUPADDR"]
     if "SHUTDOWN" in msg_upper or "ADMINISTRATIVELY DOWN" in msg_upper:
+        if lang == "en":
+            return (
+                "The network interface was intentionally shut down, or an administrator changed the port state.",
+                "1. If this is planned maintenance, continue with the maintenance window\n2. Verify which administrator changed the port state\n3. Use 'no shutdown' to bring the interface back up"
+            )
         return (
             "อินเทอร์เฟซพอร์ตเครือข่ายถูกสั่งปิดการทำงานแบบจงใจ (Shutdown) หรือแอดมินแก้ไขค่าระบบ",
             "1. หากเป็นการปิดปรับปรุง ให้ดำเนินการต่อตามรอบเวลาซ่อมบำรุง\n2. ตรวจสอบสิทธิ์ผู้ดูแลระบบที่เข้ามาสั่งชัตดาวน์พอร์ต\n3. ใช้คำสั่ง 'no shutdown' เพื่อเปิดใช้งานพอร์ตอีกครั้ง"
         )
     if "COLLISION" in msg_upper or "LATE COLLISION" in msg_upper:
+        if lang == "en":
+            return (
+                "A duplex collision was detected on the link, often caused by speed or duplex mismatch.",
+                "1. Check speed and duplex settings on both ends and align them\n2. Inspect the physical cable for damage or poor termination"
+            )
         return (
             "เกิดการชนกันของสัญญาณข้อมูลบนสายส่ง (Duplex Collision) มักเกิดจากการตั้งค่าความเร็วสายไม่ตรงกัน",
             "1. ตรวจสอบการตั้งค่าความเร็วของพอร์ต (Speed/Duplex) ทั้งสองฝั่งให้ออโต้ตรงกัน\n2. ตรวจสอบคุณภาพสายสัญญาณกายภาพว่าหักหรืองอจนเกิดสายรั่วหรือไม่"
         )
-        
+
+    if lang == "en":
+        return (
+            f"Network event {fac} [{mnem}] was reported. Message detail: {message}",
+            "1. Look up the vendor event code to assess impact\n2. Use the AI Log Analyzer with related CLI output for deeper investigation"
+        )
     return (
         f"เกิดเหตุการณ์ประเภท {fac} รหัส [{mnem}] บนระบบเครือข่าย รายละเอียดข้อความ: {message}",
         "1. ค้นหารายละเอียดคำสั่งสากลจากรหัสเหตุการณ์เพื่อประเมินระดับความเสียหาย\n2. ใช้กล่องเครื่องมือปัญญาประดิษฐ์ (AI Sandbox) ด้านบนเพื่อตรวจสอบพารามิเตอร์นี้ในขั้นถัดไป"
@@ -358,6 +413,7 @@ class SyslogUDPHandler:
             # Live broadcast over Socket.IO (lazy imports to avoid circular deps)
             try:
                 from web.dashboard import socketio
+                ai_cause_en, ai_suggestion_en = analyze_cause_on_the_fly(facility, mnemonic, log_message, lang="en")
                 socketio.emit("syslog_received", {
                     "device_name": device_name,
                     "ip_address": sender_ip,
@@ -367,6 +423,8 @@ class SyslogUDPHandler:
                     "message": log_message,
                     "ai_cause": ai_cause,
                     "ai_suggestion": ai_suggestion,
+                    "ai_cause_en": ai_cause_en,
+                    "ai_suggestion_en": ai_suggestion_en,
                     "received_at": received_at.strftime("%Y-%m-%d %H:%M:%S")
                 })
             except Exception as se:
@@ -375,11 +433,13 @@ class SyslogUDPHandler:
         except Exception as e:
             log.error(f"Syslog parse error: {e}")
 
-def analyze_cause_on_the_fly(facility, mnemonic, message):
+def analyze_cause_on_the_fly(facility, mnemonic, message, lang="th"):
     """Helper wrapping the main analyzer with robust default safeguards."""
     try:
-        return analyze_syslog_ai(facility, mnemonic, message)
+        return analyze_syslog_ai(facility, mnemonic, message, lang=lang)
     except Exception:
+        if lang == "en":
+            return ("AI could not identify a historical root cause for this event.", "1. Add related CLI output and inspect this event again")
         return ("ไม่สามารถระบุสาเหตุทางปัญญาประดิษฐ์ย้อนหลังได้สำเร็จ", "1. แนะนำให้เชื่อมโยงข้อมูล CLI เพิ่มเติมเพื่อตรวจสอบประเด็นนี้")
 
 # Global singleton syslog server object

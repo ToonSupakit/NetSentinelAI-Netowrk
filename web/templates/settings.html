@@ -61,56 +61,85 @@ tr:last-child td{border-bottom:none}
 .badge-normal { background: var(--ac-bg); color: var(--ac); border: 1px solid rgba(99,102,241,0.15); }
 .badge-anomaly { background: var(--err-bg); color: var(--err); border: 1px solid rgba(239,68,68,0.15); }
 
-/* Beautiful Minimalist Tooltips */
+/* Minimal info tooltips */
 .info-tip {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   margin-left: 6px;
   color: var(--txt-m);
   cursor: pointer;
   vertical-align: middle;
-  transition: color 0.2s;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px solid var(--brd);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
 }
 .info-tip:hover {
-  color: var(--ac);
+  color: var(--txt);
+  background: var(--panel-2);
+  border-color: var(--ac);
 }
 .info-icon {
-  width: 12px;
-  height: 12px;
-  stroke-width: 2.5px;
+  width: 10px;
+  height: 10px;
+  stroke-width: 3px;
+  stroke-linecap: round;
+}
+.info-icon circle {
+  display: none;
 }
 .info-tip::after {
   content: attr(data-tip);
   position: absolute;
-  bottom: 135%;
-  left: 50%;
-  transform: translateX(-50%) scale(0.9);
-  background: rgba(var(--card-rgb, 20, 20, 25), 0.95);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  bottom: calc(100% + 9px);
+  left: -12px;
+  transform: translateY(3px);
+  transform-origin: left bottom;
+  background: var(--card);
   border: 1px solid var(--brd);
   color: var(--txt);
-  padding: 0.6rem 0.8rem;
-  border-radius: 8px;
-  font-size: 0.72rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.74rem;
   font-weight: 500;
-  width: 240px;
+  width: min(300px, 74vw);
   white-space: normal;
-  box-shadow: var(--shadow);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.24);
   z-index: 1000;
   pointer-events: none;
   opacity: 0;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.15s, transform 0.15s;
   text-transform: none;
   letter-spacing: normal;
   line-height: 1.45;
   text-align: left;
+  text-shadow: none;
+}
+.info-tip::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 3px;
+  transform: rotate(45deg);
+  width: 8px;
+  height: 8px;
+  background: var(--card);
+  border-right: 1px solid var(--brd);
+  border-bottom: 1px solid var(--brd);
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  z-index: 1001;
 }
 .info-tip:hover::after {
   opacity: 1;
-  transform: translateX(-50%) scale(1);
+  transform: translateY(0);
 }
+.info-tip:hover::before { opacity: 1; }
 .skip-tag {
   background: var(--panel-2);
   border: 1px solid var(--brd);
@@ -199,14 +228,14 @@ tr:last-child td{border-bottom:none}
       </div>
       <!-- Subnet & Link Type Rules -->
       <h3 style="margin-top: 1.5rem;">Link Type Rules</h3>
-      <p style="color:var(--txt-m);font-size:.78rem;margin-bottom:1rem;margin-top:-0.5rem">กำหนดประเภทเส้นลิงก์ (เช่น Core, LAN, Management) ตามช่วง IP Address ของอินเทอร์เฟส</p>
+      <p style="color:var(--txt-m);font-size:.78rem;margin-bottom:1rem;margin-top:-0.5rem">Define link categories such as Core, LAN, or Management by matching interface IP address prefixes.</p>
       
       <div style="margin-bottom: 1.25rem; overflow-x: auto;">
         <table>
           <thead>
             <tr>
-              <th>Subnet Prefix (เช่น 10.10.)</th>
-              <th>Link Type (เช่น Core)</th>
+              <th>Subnet Prefix (e.g. 10.10.)</th>
+              <th>Link Type (e.g. Core)</th>
               <th style="width: 80px;">Action</th>
             </tr>
           </thead>
@@ -232,7 +261,7 @@ tr:last-child td{border-bottom:none}
 
       <!-- Skipped Interface Types -->
       <h3>Ignored Interfaces (Skip Types)</h3>
-      <p style="color:var(--txt-m);font-size:.78rem;margin-bottom:1rem;margin-top:-0.5rem">ระบบจะไม่นำอินเทอร์เฟสที่มีชื่อขึ้นต้นด้วยคำเหล่านี้ไปตรวจสอบ Anomaly หรือวาดกราฟ (เช่น Loopback, Vlan)</p>
+      <p style="color:var(--txt-m);font-size:.78rem;margin-bottom:1rem;margin-top:-0.5rem">Interfaces with these name prefixes are excluded from anomaly detection and charts, for example Loopback or Vlan.</p>
       
       <div style="background: var(--panel-2); border: 1px solid var(--brd); border-radius: 8px; padding: 1rem; margin-bottom: 1.25rem;">
         <div id="skip-tags-container" style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
@@ -240,7 +269,7 @@ tr:last-child td{border-bottom:none}
         </div>
         <div style="display: flex; gap: 0.75rem;">
           <input type="text" id="new-skip-type" class="fc" style="height: 36px;" placeholder="e.g. Loopback">
-          <button class="btn" style="padding: 0 1.25rem; height: 36px; display: inline-flex; align-items: center; justify-content: center;" onclick="addSkipType()">+ Add Prefix</button>
+          <button class="btn" style="padding: 0 1.25rem; height: 36px; display: inline-flex; align-items: center; justify-content: center;" onclick="addSkipType()">Add Prefix</button>
         </div>
       </div>
 
@@ -453,18 +482,28 @@ tr:last-child td{border-bottom:none}
     <div class="card">
       <h3>Environment Variables (.env)</h3>
       <p style="color:var(--txt-m);font-size:.82rem;margin-bottom:1.25rem">Secret values are never shown after save. Leave a secret field empty to keep the current value. Restart the app after changes.</p>
-      <div class="fg"><label>Discord Bot Token</label><input type="password" id="env-discord-token" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
-      <div class="fg"><label>Discord Channel ID</label><input type="text" id="env-discord-channel" class="fc"></div>
+      <div class="fg"><label>Flask Secret Key <span class="info-tip" data-tip="Strong random secret used to sign dashboard sessions and CSRF tokens. Required in production."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><input type="password" id="env-flask-secret" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
       <div class="fr">
-        <div class="fg"><label>Device Username</label><input type="text" id="env-dev-user" class="fc"></div>
-        <div class="fg"><label>Device Password</label><input type="password" id="env-dev-pass" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
-        <div class="fg"><label>Enable Secret</label><input type="password" id="env-dev-sec" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
+        <div class="fg"><label>App Environment <span class="info-tip" data-tip="Use production to enable stricter startup checks and secure session defaults."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><select id="env-app-env" class="fc"><option value="">development</option><option value="production">production</option><option value="test">test</option></select></div>
+        <div class="fg"><label>Secure Cookies <span class="info-tip" data-tip="Set true when the dashboard is served through HTTPS. Production mode enables this automatically."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><select id="env-cookie-secure" class="fc"><option value="">auto</option><option value="true">true</option><option value="false">false</option></select></div>
       </div>
-      <div class="fg"><label>SNMP Community</label><input type="password" id="env-snmp-com" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
       <div class="fr">
-        <div class="fg"><label>SNMPv3 Username</label><input type="text" id="env-snmp-v3-user" class="fc"></div>
-        <div class="fg"><label>SNMPv3 Auth Password</label><input type="password" id="env-snmp-v3-auth" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
-        <div class="fg"><label>SNMPv3 Privacy Password</label><input type="password" id="env-snmp-v3-priv" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
+        <div class="fg"><label>Dashboard Host</label><input type="text" id="env-dashboard-host" class="fc" placeholder="0.0.0.0"></div>
+        <div class="fg"><label>Dashboard Port</label><input type="text" id="env-dashboard-port" class="fc" placeholder="5000"></div>
+        <div class="fg"><label>Socket.IO Allowed Origins</label><input type="text" id="env-socketio-origins" class="fc" placeholder="https://example.com"></div>
+      </div>
+      <div class="fg"><label>Discord Bot Token <span class="info-tip" data-tip="Discord bot token used to send alerts. The saved value is hidden; enter a new value only when replacing it."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><input type="password" id="env-discord-token" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
+      <div class="fg"><label>Discord Channel ID <span class="info-tip" data-tip="Discord channel ID where NetSentinel sends notifications and alerts."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><input type="text" id="env-discord-channel" class="fc"></div>
+      <div class="fr">
+        <div class="fg"><label>Device Username <span class="info-tip" data-tip="Default username used when connecting to network devices by SSH or Telnet."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><input type="text" id="env-dev-user" class="fc"></div>
+        <div class="fg"><label>Device Password <span class="info-tip" data-tip="Default login password for network device access. Leave blank to keep the saved password."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><input type="password" id="env-dev-pass" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
+        <div class="fg"><label>Enable Secret <span class="info-tip" data-tip="Privilege mode secret used for enable mode on Cisco-style devices."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><input type="password" id="env-dev-sec" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
+      </div>
+      <div class="fg"><label>SNMP Community <span class="info-tip" data-tip="SNMP v1/v2c read community used by the collector when polling device metrics."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><input type="password" id="env-snmp-com" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
+      <div class="fr">
+        <div class="fg"><label>SNMPv3 Username <span class="info-tip" data-tip="SNMPv3 security username. Leave empty if your devices use SNMP v1/v2c only."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><input type="text" id="env-snmp-v3-user" class="fc"></div>
+        <div class="fg"><label>SNMPv3 Auth Password <span class="info-tip" data-tip="SNMPv3 authentication password used to verify collector access."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><input type="password" id="env-snmp-v3-auth" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
+        <div class="fg"><label>SNMPv3 Privacy Password <span class="info-tip" data-tip="SNMPv3 privacy password used for encrypted SNMP polling."><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="info-icon"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></label><input type="password" id="env-snmp-v3-priv" class="fc" autocomplete="off" placeholder="Leave blank to keep current"></div>
       </div>
       <button class="btn btn-full" onclick="saveEnv()">Save Environment</button>
     </div>
@@ -878,6 +917,21 @@ function updateRawConfigTextarea() {
   document.getElementById('cfg-raw').value = JSON.stringify(configData, null, 2);
 }
 
+function trText(text) {
+  return window.NetSentinelI18n ? NetSentinelI18n.translate(text) : text;
+}
+
+function setTranslatedPlaceholder(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.placeholder = trText(text);
+}
+
+function translateEnvPlaceholders() {
+  document.querySelectorAll('#env input[placeholder]').forEach(el => {
+    el.placeholder = trText(el.placeholder);
+  });
+}
+
 async function loadData(){
   try{
     let r=await fetch('/api/settings/config');if(r.status===401){window.location='/login';return}let d=await r.json();
@@ -900,7 +954,26 @@ async function loadData(){
       renderDevicesTable();
       document.getElementById('dev-raw').value=JSON.stringify(d.data,null,2);
     }
-    r=await fetch('/api/settings/env');d=await r.json();if(d.success){const e=d.data;document.getElementById('env-discord-channel').value=e.DISCORD_CHANNEL_ID||'';document.getElementById('env-dev-user').value=e.DEVICE_USERNAME||'';document.getElementById('env-snmp-v3-user').value=e.SNMP_V3_USER||'';document.getElementById('env-discord-token').value='';document.getElementById('env-discord-token').placeholder=e.DISCORD_TOKEN_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-dev-pass').value='';document.getElementById('env-dev-pass').placeholder=e.DEVICE_PASSWORD_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-dev-sec').value='';document.getElementById('env-dev-sec').placeholder=e.DEVICE_SECRET_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-snmp-com').value='';document.getElementById('env-snmp-com').placeholder=e.SNMP_COMMUNITY_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-snmp-v3-auth').value='';document.getElementById('env-snmp-v3-auth').placeholder=e.SNMP_V3_AUTH_CONFIGURED?'(saved — enter new to replace)':'(not set)';document.getElementById('env-snmp-v3-priv').value='';document.getElementById('env-snmp-v3-priv').placeholder=e.SNMP_V3_PRIV_CONFIGURED?'(saved — enter new to replace)':'(not set)'}
+    r=await fetch('/api/settings/env');d=await r.json();if(d.success){
+      const e=d.data;
+      const saved='(saved — enter new to replace)';
+      const notSet='(not set)';
+      document.getElementById('env-discord-channel').value=e.DISCORD_CHANNEL_ID||'';
+      document.getElementById('env-dev-user').value=e.DEVICE_USERNAME||'';
+      document.getElementById('env-snmp-v3-user').value=e.SNMP_V3_USER||'';
+      document.getElementById('env-discord-token').value='';
+      setTranslatedPlaceholder('env-discord-token', e.DISCORD_TOKEN_CONFIGURED ? saved : notSet);
+      document.getElementById('env-dev-pass').value='';
+      setTranslatedPlaceholder('env-dev-pass', e.DEVICE_PASSWORD_CONFIGURED ? saved : notSet);
+      document.getElementById('env-dev-sec').value='';
+      setTranslatedPlaceholder('env-dev-sec', e.DEVICE_SECRET_CONFIGURED ? saved : notSet);
+      document.getElementById('env-snmp-com').value='';
+      setTranslatedPlaceholder('env-snmp-com', e.SNMP_COMMUNITY_CONFIGURED ? saved : notSet);
+      document.getElementById('env-snmp-v3-auth').value='';
+      setTranslatedPlaceholder('env-snmp-v3-auth', e.SNMP_V3_AUTH_CONFIGURED ? saved : notSet);
+      document.getElementById('env-snmp-v3-priv').value='';
+      setTranslatedPlaceholder('env-snmp-v3-priv', e.SNMP_V3_PRIV_CONFIGURED ? saved : notSet);
+    }
     loadModelStatus();
     loadUsers();
   }catch(e){showToast('Failed to load',true)}
@@ -979,6 +1052,7 @@ async function delUser(id,name){
 
 async function changeRole(id,role){try{const r=await fetch('/api/users/'+id+'/role',{method:'PUT',headers:csrfHeaders({'Content-Type':'application/json'}),body:JSON.stringify({role:role})});const d=await r.json();d.success?showToast('Role updated'):showToast(d.message,true);if(!d.success)loadUsers()}catch(e){showToast('Error',true);loadUsers()}}
 
+document.addEventListener('languagechanged', translateEnvPlaceholders);
 loadData();setInterval(loadModelStatus,10000);
 </script>
 </body>

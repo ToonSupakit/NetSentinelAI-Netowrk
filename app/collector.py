@@ -9,6 +9,7 @@ import os
 import logging
 from dotenv import load_dotenv
 from app import collector_rules
+from app.security import device_credential
 from app.snmp_helper import get_snmp_interfaces
 from app.simulator import simulated_interfaces, simulator_enabled
 
@@ -55,9 +56,9 @@ def get_device_credentials(device):
     return {
         "device_type": device["device_type"],
         "host": device["host"],
-        "username": device.get("username") or os.getenv("DEVICE_USERNAME", "admin"),
-        "password": device.get("password") or os.getenv("DEVICE_PASSWORD", "admin"),
-        "secret": device.get("secret") or os.getenv("DEVICE_SECRET", "admin"),
+        "username": device_credential(device, "username", "DEVICE_USERNAME"),
+        "password": device_credential(device, "password", "DEVICE_PASSWORD"),
+        "secret": device_credential(device, "secret", "DEVICE_SECRET"),
     }
 
 

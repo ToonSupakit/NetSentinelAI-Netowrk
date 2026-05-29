@@ -54,6 +54,7 @@
   </div>
 </div>
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="/static/i18n.js"></script>
 <script>
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed')}
 // Highlight active nav
@@ -63,12 +64,12 @@ function themeColor(name){return getComputedStyle(document.documentElement).getP
 function confirmLogout(event) {
   event.preventDefault();
   Swal.fire({
-    title: 'Confirm Logout',
-    text: 'Are you sure you want to log out of NetSentinel AI?',
+    title: NetSentinelI18n.translate('Confirm Logout'),
+    text: NetSentinelI18n.translate('Are you sure you want to log out of NetSentinel AI?'),
     icon: 'question',
     showCancelButton: true,
-    confirmButtonText: 'Logout',
-    cancelButtonText: 'Cancel',
+    confirmButtonText: NetSentinelI18n.translate('Logout'),
+    cancelButtonText: NetSentinelI18n.translate('Cancel'),
     background: themeColor('--card'),
     color: themeColor('--txt'),
     confirmButtonColor: '#ef4444',
@@ -550,99 +551,6 @@ const TH_DICT = {
   "Retention": "ระยะเวลาเก็บข้อมูล"
 };
 
-// Global translation utilities
-RemediationManager.getTranslation = function(text) {
-  const lang = localStorage.getItem('netsentinel_lang') || 'en';
-  if (lang === 'en') return text;
-  return TH_DICT[text] || text;
-};
+// Remove old translation logic - now handled by i18n.js
 
-RemediationManager.translatePage = function() {
-  const lang = localStorage.getItem('netsentinel_lang') || 'en';
-  
-  // Update toggle button text dynamically
-  const textBtn = document.getElementById('lang-toggle-text');
-  if (textBtn) {
-    textBtn.textContent = lang === 'en' ? 'English / ไทย' : 'ภาษาไทย / EN';
-  }
-  
-  // Translate standard text containers
-  const elements = document.querySelectorAll('span, h1, h2, h3, h4, a, button, label, th, td, option');
-  elements.forEach(el => {
-    if (el.closest('.remediation-progress-card') || el.closest('.swal2-container')) return;
-    
-    const text = el.textContent ? el.textContent.trim() : '';
-    if (!text) return;
-    
-    let origText = el.getAttribute('data-orig-en');
-    if (!origText) {
-      origText = text;
-      el.setAttribute('data-orig-en', origText);
-    }
-    
-    const translated = this.getTranslation(origText);
-    if (translated && translated !== origText) {
-      if (el.children.length === 0) {
-        el.textContent = translated;
-      } else {
-        // Translate only direct text nodes, preserving SVG/HTML children
-        for (let node of el.childNodes) {
-          if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() === origText) {
-            node.nodeValue = translated;
-          }
-        }
-      }
-    } else if (lang === 'en' && origText) {
-      // Revert to English if user switched to English
-      if (el.children.length === 0) {
-        el.textContent = origText;
-      } else {
-        for (let node of el.childNodes) {
-          if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim() === translated) {
-            node.nodeValue = origText;
-          }
-        }
-      }
-    }
-  });
-
-  // Translate input placeholders
-  const inputs = document.querySelectorAll('input[placeholder]');
-  inputs.forEach(el => {
-    let origText = el.getAttribute('data-orig-placeholder');
-    if (!origText) {
-      origText = el.getAttribute('placeholder');
-      el.setAttribute('data-orig-placeholder', origText);
-    }
-    const translated = this.getTranslation(origText);
-    if (translated) {
-      el.setAttribute('placeholder', translated);
-    }
-  });
-};
-
-window.toggleLanguage = function() {
-  const current = localStorage.getItem('netsentinel_lang') || 'en';
-  const next = current === 'en' ? 'th' : 'en';
-  localStorage.setItem('netsentinel_lang', next);
-  
-  // Re-observe setup
-  window.translationObserver.disconnect();
-  RemediationManager.translatePage();
-  window.translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-};
-
-// Setup dynamic MutationObserver to auto-translate dynamic DOM renders (like Ajax tables)
-window.translationObserver = new MutationObserver((mutations) => {
-  window.translationObserver.disconnect();
-  RemediationManager.translatePage();
-  window.translationObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-});
-
-// Run initialization
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => RemediationManager.init());
-} else {
-  RemediationManager.init();
-}
 </script>
