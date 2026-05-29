@@ -243,10 +243,10 @@ class SyslogUDPHandler:
             with engine.connect() as conn:
                 conn.execute(
                     text("""
-                        INSERT INTO device_syslogs 
-                        (device_name, ip_address, facility, severity, mnemonic, message, ai_cause, ai_suggestion, received_at)
-                        VALUES (:dev, :ip, :fac, :sev, :mnem, :msg, :cause, :sugg, :recv)
-                    """),
+                         INSERT INTO device_syslogs 
+                         (device_name, ip_address, facility, severity, mnemonic, message, ai_cause, ai_suggestion, received_at)
+                         VALUES (:dev, :ip, :fac, :sev, :mnem, :msg, :cause, :sugg, :recv)
+                     """),
                     {
                         "dev": device_name,
                         "ip": sender_ip,
@@ -260,6 +260,100 @@ class SyslogUDPHandler:
                     }
                 )
                 conn.commit()
+
+            # If syslog is a Cisco LINK/LINEPROTO status change, immediately update interface_logs
+            if facility in ("LINK", "LINEPROTO") and mnemonic in ("CHANGED", "UPDOWN"):
+                status_match = re.search(r"Interface\s+([A-Za-z0-9/\.\-]+),\s+changed\s+state\s+to\s+([a-z\s_]+)", log_message, re.IGNORECASE)
+                if status_match:
+                    intf_name = status_match.group(1).strip()
+                    raw_status = status_match.group(2).strip().lower()
+                    
+                    status_val = "up" if "up" in raw_status else "down"
+                    if "administratively down" in raw_status or "admin" in raw_status:
+                        status_val = "admin_down"
+                    
+                    label_val = "normal" if status_val == "up" else "anomaly"
+                    
+                    try:
+                        with engine.connect() as db_conn:
+                            latest_info = db_conn.execute(
+                                text("""
+                                    SELECT ip_address, reliability, network_load, rxload, input_errors, link_type, zone, location 
+                                    FROM interface_logs 
+                                    WHERE device_name = :dev AND interface_name = :intf 
+                                    ORDER BY collected_at DESC LIMIT 1
+                                """),
+                                {"dev": device_name, "intf": intf_name}
+                            ).fetchone()
+                            
+                            if latest_info:
+                                ip_address, reliability, network_load, rxload, input_errors, link_type, zone, location = latest_info
+                                
+                                log_id = db_conn.execute(
+                                    text("""
+                                        INSERT INTO interface_logs 
+                                        (device_name, interface_name, ip_address, status, protocol, reliability, network_load, rxload, input_errors, link_type, zone, location, label, collected_at, created_at)
+                                        VALUES (:dev, :intf, :ip, :status, :proto, :rel, :load, :rx, :err, :ltype, :zone, :loc, :label, :now, :now)
+                                    """),
+                                    {
+                                        "dev": device_name,
+                                        "intf": intf_name,
+                                        "ip": ip_address,
+                                        "status": status_val,
+                                        "proto": status_val,
+                                        "rel": reliability,
+                                        "load": network_load,
+                                        "rx": rxload,
+                                        "err": input_errors,
+                                        "ltype": link_type,
+                                        "zone": zone,
+                                        "loc": location,
+                                        "label": label_val,
+                                        "now": datetime.now()
+                                    }
+                                ).lastrowid
+                                
+                                if label_val == "anomaly":
+                                    db_conn.execute(
+                                        text("""
+                                            INSERT INTO ai_predictions 
+                                            (log_id, device_name, interface_name, prediction_label, confidence_score, detection_source, severity, predicted_at)
+                                            VALUES (:log_id, :dev, :intf, 'anomaly', 1.0, 'syslog', :sev, :now)
+                                        """),
+                                        {
+                                            "log_id": log_id,
+                                            "dev": device_name,
+                                            "intf": intf_name,
+                                            "sev": "High" if status_val == "down" else "Medium",
+                                            "now": datetime.now()
+                                        }
+                                    )
+                                    
+                                    try:
+                                        from web.dashboard import socketio
+                                        socketio.emit("anomaly", {
+                                            "device": device_name,
+                                            "intf": intf_name,
+                                            "ip": ip_address,
+                                            "prediction": "anomaly",
+                                            "is_device_down": False,
+                                            "detection_source": "syslog",
+                                            "severity": "High" if status_val == "down" else "Medium"
+                                        })
+                                    except Exception as sock_err:
+                                        log.debug(f"Syslog immediate socket emit failed: {sock_err}")
+                                else:
+                                    db_conn.execute(
+                                        text("""
+                                            UPDATE ai_predictions 
+                                            SET is_fixed = 1, fixed_at = :now 
+                                            WHERE device_name = :dev AND interface_name = :intf AND prediction_label = 'anomaly' AND COALESCE(is_fixed, 0) = 0
+                                        """),
+                                        {"dev": device_name, "intf": intf_name, "now": datetime.now()}
+                                    )
+                                db_conn.commit()
+                    except Exception as db_err:
+                        log.debug(f"Syslog immediate interface_logs insertion failed: {db_err}")
 
             # Live broadcast over Socket.IO (lazy imports to avoid circular deps)
             try:

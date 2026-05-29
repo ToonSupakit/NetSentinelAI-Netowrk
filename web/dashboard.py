@@ -1230,15 +1230,50 @@ def execute_remediation_task(device_name, intf, action, limit_mbps=None):
             except Exception as ex:
                 log.warning("mark_anomalies_fixed_for_interface: %s", ex)
 
+            # Immediately insert a normal up log into the DB so UI updates instantly
+            try:
+                from datetime import datetime
+                with engine.connect() as conn:
+                    latest_row = conn.execute(
+                        text("""
+                            SELECT ip_address, reliability, network_load, rxload, input_errors, link_type, zone, location 
+                            FROM interface_logs 
+                            WHERE device_name = :dev AND interface_name = :intf 
+                            ORDER BY collected_at DESC LIMIT 1
+                        """),
+                        {"dev": device_name, "intf": intf}
+                    ).fetchone()
+
+                    if latest_row:
+                        ip_address, reliability, network_load, rxload, input_errors, link_type, zone, location = latest_row
+                        conn.execute(
+                            text("""
+                                INSERT INTO interface_logs 
+                                (device_name, interface_name, ip_address, status, protocol, reliability, network_load, rxload, input_errors, link_type, zone, location, label, collected_at, created_at)
+                                VALUES (:dev, :intf, :ip, 'up', 'up', :rel, :load, :rx, :err, :ltype, :zone, :loc, 'normal', :now, :now)
+                            """),
+                            {
+                                "dev": device_name,
+                                "intf": intf,
+                                "ip": ip_address,
+                                "rel": reliability,
+                                "load": network_load,
+                                "rx": rxload,
+                                "err": input_errors,
+                                "ltype": link_type,
+                                "zone": zone,
+                                "loc": location,
+                                "now": datetime.now()
+                            }
+                        )
+                        conn.commit()
+            except Exception as db_ex:
+                log.warning("Failed to insert immediate up state: %s", db_ex)
+
         label = {"fix": "Fix", "limit": f"Limit ({limit_mbps} Mbps)", "removelimit": "Remove Limit"}
         log.info(f"Remediation ({action}): {device_name} — {intf} successful")
 
-        # Trigger immediate re-collection after router stabilizes
-        import time as _time
-        _time.sleep(2)
-        request_collect_now()
-        _time.sleep(1.5)  # Wait briefly for collector thread to run and update DB
-
+        # Emit successful result immediately to unblock UI loading spinner
         socketio.emit(
             "remediation_result",
             {
@@ -1249,6 +1284,13 @@ def execute_remediation_task(device_name, intf, action, limit_mbps=None):
                 "action": action,
             },
         )
+
+        # Trigger background re-collection after router stabilizes without blocking the UI
+        def run_delayed_collect():
+            import time as _time
+            _time.sleep(2)
+            request_collect_now()
+        socketio.start_background_task(run_delayed_collect)
     except Exception as e:
         log.error(f"Remediation ({action}) failed: {device_name} — {intf}: {e}")
         socketio.emit(
