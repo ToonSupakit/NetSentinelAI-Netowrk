@@ -527,7 +527,30 @@ def get_device_status(active_devices=None):
                         AND l.collected_at = latest.max_time
                 ORDER BY l.device_name, l.interface_name
             """))
-        return result.fetchall()
+        rows = result.fetchall()
+
+        # Filter out stale/legacy 'ghost' interfaces (e.g. from previous simulated runs or removed configs)
+        # that haven't been actively updated in the last 15 minutes.
+        from datetime import datetime, timedelta
+        cutoff = datetime.now() - timedelta(minutes=15)
+
+        filtered_rows = []
+        for row in rows:
+            dt = row[9]  # collected_at timestamp
+            if isinstance(dt, str):
+                try:
+                    dt = datetime.strptime(dt, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    try:
+                        dt = datetime.fromisoformat(dt)
+                    except ValueError:
+                        dt = None
+
+            # Keep only recently updated interfaces (or mock rows with missing timestamps in minimal unit tests)
+            if dt is None or dt >= cutoff:
+                filtered_rows.append(row)
+
+        return filtered_rows
 
 
 # -- User Management ----------------------------------------------------------
