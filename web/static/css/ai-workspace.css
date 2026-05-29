@@ -1,0 +1,324 @@
+/* Minimal — อ่านง่าย ใช้ง่าย (visual only) */
+
+:root {
+  --ai-purple: #7c3aed;
+  --ai-purple-hover: #6d28d9;
+  --ai-radius: var(--radius, 12px);
+  --ai-radius-sm: var(--radius-sm, 8px);
+}
+
+:root[data-theme="dark"] {
+  --ai-purple: #a78bfa;
+  --ai-purple-hover: #c4b5fd;
+}
+
+:root {
+  --ac: var(--ai-purple);
+  --ac-h: var(--ai-purple-hover);
+}
+
+/* ── Layout ทุกหน้า ───────────────────────────────────── */
+.ns-main {
+  flex: 1;
+  padding: 1.75rem 2rem;
+  min-width: 0;
+}
+
+.ns-page-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--txt);
+}
+
+.ns-card {
+  background: var(--card);
+  border: 1px solid var(--brd);
+  border-radius: var(--ai-radius);
+  padding: 1.25rem;
+}
+
+.ns-card h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--txt);
+}
+
+/* ── AI panel (logs) ──────────────────────────────────── */
+.ai-workspace {
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  overflow: hidden;
+  min-height: auto;
+}
+
+.ai-ws-header {
+  padding: 1.25rem 1.25rem 0.75rem;
+  border-bottom: 1px solid var(--brd-soft);
+}
+
+.ai-ws-header h3 {
+  font-size: 0.9375rem !important;
+  font-weight: 600 !important;
+  margin-bottom: 0.25rem !important;
+  gap: 0.5rem !important;
+}
+
+.ai-ws-header p {
+  font-size: var(--text-sm, 0.8125rem);
+  color: var(--txt-m);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.ai-ws-hint {
+  font-size: var(--text-sm, 0.8125rem);
+  color: var(--txt-m);
+  padding: 0.75rem 1.25rem;
+  line-height: 1.5;
+  border-bottom: 1px solid var(--brd-soft);
+}
+
+.ai-chat-feed {
+  padding: 1rem 1.25rem;
+  min-height: 0;
+  max-height: none;
+}
+
+.ai-bubble {
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--ai-radius-sm);
+  font-size: var(--text-sm, 0.8125rem);
+  line-height: 1.55;
+  max-width: 100%;
+}
+
+.ai-bubble-system {
+  background: var(--panel-2);
+  border: 1px solid var(--brd-soft);
+  color: var(--txt-m);
+}
+
+.ai-bubble-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--ac);
+  margin-bottom: 0.25rem;
+}
+
+.ai-composer {
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--brd-soft);
+}
+
+.ai-composer-inner {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  background: var(--panel-2);
+  border: 1px solid var(--brd);
+  border-radius: var(--ai-radius-sm);
+  padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+}
+
+.ai-composer-inner:focus-within {
+  border-color: var(--ac);
+  outline: none;
+  box-shadow: var(--focus);
+}
+
+.ai-composer-input,
+.sandbox-textarea.ai-composer-input {
+  flex: 1;
+  min-height: 56px !important;
+  max-height: 120px;
+  margin: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0.35rem 0 !important;
+  font-size: var(--text-sm, 0.8125rem) !important;
+  line-height: 1.5 !important;
+  color: var(--txt) !important;
+  resize: vertical !important;
+}
+
+.ai-composer-input::placeholder {
+  color: var(--txt-m);
+}
+
+.ai-send-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--ai-radius-sm);
+  background: var(--ac);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ai-send-btn:hover {
+  background: var(--ac-h);
+}
+
+.ai-send-btn:focus-visible {
+  outline: 2px solid var(--ac);
+  outline-offset: 2px;
+}
+
+/* Modal — เรียบ อ่านง่าย */
+.modal-overlay.ai-insight-modal .modal-container {
+  max-width: 560px;
+  border-radius: var(--ai-radius);
+}
+
+.modal-overlay.ai-insight-modal .modal-body {
+  gap: 0.75rem;
+  padding: 1.25rem;
+}
+
+.modal-overlay.ai-insight-modal .modal-field {
+  padding: 0.875rem 1rem;
+  border-radius: var(--ai-radius-sm);
+  background: var(--panel-2);
+  border: 1px solid var(--brd-soft);
+}
+
+.modal-overlay.ai-insight-modal .modal-field-title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--txt-m);
+  margin-bottom: 0.35rem;
+}
+
+.modal-overlay.ai-insight-modal .modal-field-cause .modal-field-title {
+  color: var(--ac);
+}
+
+.modal-overlay.ai-insight-modal .modal-field-content {
+  font-size: var(--text-base, 0.9375rem);
+  line-height: 1.6;
+}
+
+.modal-overlay[style*="flex"] .modal-field-content {
+  animation: aiFadeIn 0.25s ease forwards;
+}
+
+@keyframes aiFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Logs page */
+.logs-page .main {
+  padding: 1.75rem 2rem;
+  gap: 1.25rem;
+}
+
+.logs-page .header h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.logs-page .grid-layout {
+  grid-template-columns: 1.6fr 1fr;
+  gap: 1.25rem;
+}
+
+.logs-page .card {
+  padding: 1.25rem;
+  box-shadow: none;
+}
+
+.logs-page .card h3 {
+  font-size: 0.9375rem;
+  margin-bottom: 1rem;
+}
+
+.logs-page .tools {
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.logs-page .select,
+.logs-page .input {
+  height: 36px;
+  font-size: var(--text-sm, 0.8125rem);
+  border-radius: var(--ai-radius-sm);
+}
+
+.logs-page .btn {
+  height: 36px;
+  font-size: var(--text-sm, 0.8125rem);
+  border-radius: var(--ai-radius-sm);
+  font-weight: 500;
+}
+
+.logs-page table {
+  font-size: var(--text-sm, 0.8125rem);
+}
+
+.logs-page th {
+  font-size: 0.6875rem;
+  padding: 0.625rem 0.875rem;
+}
+
+.logs-page td {
+  padding: 0.625rem 0.875rem;
+}
+
+.logs-page td:nth-child(5) {
+  white-space: normal;
+  max-width: 220px;
+  line-height: 1.45;
+  color: var(--soft);
+}
+
+.logs-page .table-wrap {
+  border-radius: var(--ai-radius-sm);
+}
+
+/* Dashboard feed */
+.feed-message .fi {
+  padding: 0.75rem;
+  border-radius: var(--ai-radius-sm);
+  border: 1px solid var(--brd-soft);
+  background: var(--panel-2);
+}
+
+.feed-message .fi:hover {
+  border-color: var(--brd);
+}
+
+.feed-message .ft {
+  font-size: var(--text-sm, 0.8125rem);
+}
+
+.feed-message .fsu,
+.feed-message .ftime {
+  font-size: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-overlay[style*="flex"] .modal-field-content,
+  .ai-send-btn {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .logs-page .grid-layout {
+    grid-template-columns: 1fr;
+  }
+  .ns-main,
+  .logs-page .main {
+    padding: 1.25rem;
+  }
+}

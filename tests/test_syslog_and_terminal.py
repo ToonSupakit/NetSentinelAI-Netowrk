@@ -292,241 +292,96 @@ def test_api_analyze_syslog_ondemand_sandbox(client):
 
 
 # ---------------------------------------------------------
-# 4. Feature B: Web Terminal Routing & SocketIO Tests
+# 4. Syslog Server Status & Test Endpoints
 # ---------------------------------------------------------
 
-def test_terminal_page_requires_admin(client):
-    """Verify that only admins can access `/terminal` page."""
-    # No login -> redirect
-    resp1 = client.get("/terminal")
-    assert resp1.status_code == 302
+def test_syslog_handler_get_status():
+    """Verify get_status returns correct runtime status dict."""
+    handler = SyslogUDPHandler(host="127.0.0.1", port=65501)
+    status = handler.get_status()
+    assert status["running"] is False
+    assert status["port"] == 65501
+    assert status["received_count"] == 0
+    assert status["started_at"] is None
+    assert status["bind_error"] is None
 
-    # Standard User role -> redirect back to /
+
+def test_syslog_handler_send_test(monkeypatch):
+    """Verify send_test sends a UDP packet to the configured port."""
+    handler = SyslogUDPHandler(host="127.0.0.1", port=65502)
+    handler.running = True
+
+    mock_sock = MagicMock()
+    with patch("socket.socket", return_value=mock_sock):
+        ok, msg = handler.send_test()
+        assert ok is True
+        assert "65502" in msg
+        mock_sock.sendto.assert_called_once()
+        mock_sock.close.assert_called_once()
+
+
+def test_api_syslog_status_requires_login(client):
+    """Verify /api/syslog/status requires authentication."""
+    resp = client.get("/api/syslog/status")
+    assert resp.status_code == 401
+
+
+def test_api_syslog_status_returns_info(client, monkeypatch):
+    """Verify /api/syslog/status returns server info."""
     _session(client, role="user")
-    resp2 = client.get("/terminal")
-    assert resp2.status_code == 302
-    assert resp2.headers["Location"] == "/"
 
-    # Admin role -> 200 Success
-    _session(client, role="admin")
-    resp3 = client.get("/terminal")
-    assert resp3.status_code == 200
-    assert "Web Console" in resp3.get_data(as_text=True) or "terminal" in resp3.get_data(as_text=True)
-
-
-def test_socketio_terminal_connect_missing_device(monkeypatch):
-    """Assert terminal_connect rejects request if device_name is missing."""
-    emitted = []
-    def mock_emit(channel, payload, to=None):
-        emitted.append((channel, payload, to))
-        
-    monkeypatch.setattr(dash.socketio, "emit", mock_emit)
-    
-    # Mock sid using clean monkeypatching to avoid proxy inspection errors
-    mock_req = MagicMock()
-    mock_req.sid = "sid-123"
-    monkeypatch.setattr(dash, "request", mock_req)
-    
-    dash._terminal_connect({})
-        
-    assert len(emitted) == 1
-    assert emitted[0][0] == "terminal_status"
-    assert emitted[0][1]["status"] == "error"
-    assert "Device name required" in emitted[0][1]["message"]
-
-
-def test_socketio_terminal_connect_unregistered_device(monkeypatch):
-    """Assert terminal_connect rejects unregistered device name lookup."""
-    emitted = []
-    def mock_emit(channel, payload, to=None):
-        emitted.append((channel, payload, to))
-        
-    monkeypatch.setattr(dash.socketio, "emit", mock_emit)
-    
-    # Mock configuration lookup to return None
-    monkeypatch.setattr(dash, "get_device_by_name", lambda name: None)
-    
-    mock_req = MagicMock()
-    mock_req.sid = "sid-123"
-    monkeypatch.setattr(dash, "request", mock_req)
-    
-    dash._terminal_connect({"device_name": "NonExistent"})
-        
-    assert any(
-        e[0] == "terminal_status" and e[1]["status"] == "error" and "not registered" in e[1]["message"]
-        for e in emitted
-    )
-
-
-def test_socketio_terminal_connect_success(monkeypatch):
-    """Verify terminal connection lifecycle, mock netmiko instance, keepalive VTY command stream."""
-    emitted = []
-    def mock_emit(channel, payload, to=None):
-        emitted.append((channel, payload, to))
-        
-    monkeypatch.setattr(dash.socketio, "emit", mock_emit)
-    
-    # Mock configuration lookup to return device host and type info
-    monkeypatch.setattr(dash, "get_device_by_name", lambda name: {"host": "10.0.0.1", "device_type": "cisco_ios"})
-    
-    # Mock background thread start task
-    tasks_spawned = []
-    def mock_start_task(fn, *args, **kwargs):
-        tasks_spawned.append((fn, args, kwargs))
-        return MagicMock()
-    monkeypatch.setattr(dash.socketio, "start_background_task", mock_start_task)
-    
-    # Mock ConnectHandler
-    mock_connect_obj = MagicMock()
-    mock_connect_handler = MagicMock(return_value=mock_connect_obj)
-    monkeypatch.setattr("web.dashboard.ConnectHandler", mock_connect_handler)
-    
-    dash.active_terminals.clear()
-    
-    mock_req = MagicMock()
-    mock_req.sid = "sid-123"
-    monkeypatch.setattr(dash, "request", mock_req)
-    
-    dash._terminal_connect({"device_name": "SW-L2-1"})
-        
-    # Verify Connection handler was invoked
-    mock_connect_handler.assert_called_once()
-    assert mock_connect_handler.call_args[1]["host"] == "10.0.0.1"
-    assert mock_connect_handler.call_args[1]["device_type"] == "cisco_ios"
-    mock_connect_obj.enable.assert_called_once()
-    
-    # Verify active terminal state stored
-    assert "sid-123" in dash.active_terminals
-    assert dash.active_terminals["sid-123"]["device"] == "SW-L2-1"
-    assert dash.active_terminals["sid-123"]["read_thread_running"] is True
-    
-    # Verify background task spawned
-    assert len(tasks_spawned) == 1
-    assert tasks_spawned[0][0] == dash.read_vty_stream
-    assert tasks_spawned[0][1][0] == "sid-123"
-    
-    # Verify status feedback sent
-    assert any(e[0] == "terminal_status" and e[1]["status"] == "connected" for e in emitted)
-
-
-def test_socketio_terminal_input(monkeypatch):
-    """Verify input character keystroke writing directly to Netmiko's write_channel."""
-    mock_conn = MagicMock()
-    dash.active_terminals = {
-        "sid-123": {
-            "net_connect": mock_conn,
-            "device": "SW-L2-1",
-            "read_thread_running": True
-        }
+    mock_instance = MagicMock()
+    mock_instance.get_status.return_value = {
+        "running": True,
+        "port": 5140,
+        "host": "0.0.0.0",
+        "received_count": 42,
+        "started_at": "2026-05-29 10:00:00",
+        "bind_error": None,
     }
-    
-    mock_req = MagicMock()
-    mock_req.sid = "sid-123"
-    monkeypatch.setattr(dash, "request", mock_req)
-    
-    # Type command sequence in console
-    dash._terminal_input({"data": "show ip interface brief\r"})
-        
-    mock_conn.write_channel.assert_called_once_with("show ip interface brief\r")
+    monkeypatch.setattr("app.syslog_server.syslog_server_instance", mock_instance)
+
+    resp = client.get("/api/syslog/status")
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert data["running"] is True
+    assert data["port"] == 5140
+    assert data["received_count"] == 42
 
 
-def test_socketio_disconnect_garbage_collection(monkeypatch):
-    """Verify active terminal connection is immediately garbage collected on websocket disconnect."""
-    mock_conn = MagicMock()
-    dash.active_terminals = {
-        "sid-123": {
-            "net_connect": mock_conn,
-            "device": "SW-L2-1",
-            "read_thread_running": True
-        }
-    }
-    
-    # Emits disconnected status
-    emitted = []
-    def mock_emit(channel, payload, to=None):
-        emitted.append((channel, payload, to))
-    monkeypatch.setattr(dash.socketio, "emit", mock_emit)
-    
-    mock_req = MagicMock()
-    mock_req.sid = "sid-123"
-    monkeypatch.setattr(dash, "request", mock_req)
-    
-    dash._socketio_disconnect_terminal()
-        
-    # Session removed from list
-    assert "sid-123" not in dash.active_terminals
-    mock_conn.disconnect.assert_called_once()
-    assert any(e[0] == "terminal_status" and e[1]["status"] == "disconnected" for e in emitted)
+def test_api_syslog_test_requires_login(client):
+    """Verify /api/syslog/test requires authentication (or CSRF)."""
+    resp = client.post("/api/syslog/test")
+    assert resp.status_code in (400, 401)  # CSRF middleware may fire before login check
 
 
-def test_read_vty_stream_loop(monkeypatch):
-    """Verify VTY background read_channel generator loop emits console output payload."""
-    mock_conn = MagicMock()
-    mock_conn.read_channel.side_effect = ["Switch#", "", ConnectionError("Disconnected")]
-    
-    dash.active_terminals = {
-        "sid-123": {
-            "net_connect": mock_conn,
-            "device": "SW-L2-1",
-            "read_thread_running": True
-        }
-    }
-    
-    emitted = []
-    def mock_emit(channel, payload, to=None):
-        emitted.append((channel, payload, to))
-    monkeypatch.setattr(dash.socketio, "emit", mock_emit)
-    monkeypatch.setattr(dash.socketio, "sleep", lambda x: None)
-    
-    # Run reader function - will break out when ConnectionError raised
-    dash.read_vty_stream("sid-123", mock_conn)
-    
-    # Assert output string emitted
-    assert any(e[0] == "terminal_output" and e[1]["data"] == "Switch#" for e in emitted)
-    assert "sid-123" not in dash.active_terminals  # Cleaned up
+def test_api_syslog_test_sends_message(client, monkeypatch):
+    """Verify /api/syslog/test triggers a test syslog message."""
+    csrf = _session(client, role="user")
+
+    mock_instance = MagicMock()
+    mock_instance.running = True
+    mock_instance.send_test.return_value = (True, "Test syslog sent to 127.0.0.1:5140")
+    monkeypatch.setattr("app.syslog_server.syslog_server_instance", mock_instance)
+
+    resp = client.post("/api/syslog/test", headers={"X-CSRF-Token": csrf})
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+    assert "Test syslog sent" in data["message"]
 
 
-def test_vty_keepalive_loop_sends_non_intrusive_keystroke(monkeypatch):
-    """Verify VTY keepalive thread writes whitespace backspaces to active console terminals."""
-    mock_conn1 = MagicMock()
-    mock_conn2 = MagicMock()
-    
-    dash.active_terminals = {
-        "sid-1": {
-            "net_connect": mock_conn1,
-            "device": "SW-L2-1",
-            "read_thread_running": True
-        },
-        "sid-2": {
-            "net_connect": mock_conn2,
-            "device": "SW-L2-2",
-            "read_thread_running": True
-        }
-    }
-    
-    # Make sleep raise an exception to exit the infinite while True loop immediately after first check
-    class LoopDone(Exception):
-        pass
-        
-    def mock_sleep(seconds):
-        if seconds == 60:
-            # First tick: execute keepalive logic, then terminate loop
-            pass
-        else:
-            raise LoopDone()
-            
-    sleep_count = 0
-    def mock_sleep_ticks(seconds):
-        nonlocal sleep_count
-        sleep_count += 1
-        if sleep_count > 1:
-            raise LoopDone()
-            
-    monkeypatch.setattr(dash.socketio, "sleep", mock_sleep_ticks)
-    
-    with pytest.raises(LoopDone):
-        dash.vty_keepalive_loop()
-        
-    # Assert both active sessions received keepalive sequence " \b"
-    mock_conn1.write_channel.assert_called_once_with(" \b")
-    mock_conn2.write_channel.assert_called_once_with(" \b")
+def test_api_syslog_test_server_not_running(client, monkeypatch):
+    """Verify /api/syslog/test returns 503 when server is not running."""
+    csrf = _session(client, role="user")
+
+    mock_instance = MagicMock()
+    mock_instance.running = False
+    monkeypatch.setattr("app.syslog_server.syslog_server_instance", mock_instance)
+
+    resp = client.post("/api/syslog/test", headers={"X-CSRF-Token": csrf})
+    assert resp.status_code == 503
+    data = resp.get_json()
+    assert data["success"] is False
+

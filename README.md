@@ -97,7 +97,7 @@ python -m pip install -r requirements.txt -r requirements-dev.txt
 Create runtime files:
 
 ```bash
-cp .env.example .env
+cp config/.env.example .env
 cp config/config.example.yaml config/config.yaml
 cp config/devices.example.yaml config/devices.yaml
 ```
@@ -443,5 +443,6 @@ python -m pytest
 - Run `python -m pytest` before deploy.
 
 ## License
+
 
 This project is for educational purposes.

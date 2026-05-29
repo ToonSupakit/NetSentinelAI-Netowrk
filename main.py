@@ -22,7 +22,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s] [%(levelname)s] [%(module)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[logging.FileHandler("netsentinel.log", encoding="utf-8"), logging.StreamHandler(sys.stdout)],
+    handlers=[logging.FileHandler("logs/netsentinel.log", encoding="utf-8"), logging.StreamHandler(sys.stdout)],
 )
 log = logging.getLogger(__name__)
 

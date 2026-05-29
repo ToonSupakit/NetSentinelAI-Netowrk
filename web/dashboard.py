@@ -86,7 +86,7 @@ audit = logging.getLogger("audit")
 if not any(
     isinstance(h, logging.FileHandler) and getattr(h, "baseFilename", "").endswith("audit.log") for h in audit.handlers
 ):
-    audit_handler = logging.FileHandler("audit.log", encoding="utf-8")
+    audit_handler = logging.FileHandler("logs/audit.log", encoding="utf-8")
     audit_handler.setFormatter(logging.Formatter("[%(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"))
     audit.addHandler(audit_handler)
 audit.setLevel(logging.INFO)
@@ -354,12 +354,6 @@ def logs_page():
     return render_template("logs.html")
 
 
-@app.route("/terminal")
-@admin_required
-def terminal_page():
-    return render_template("terminal.html")
-
-
 @app.route("/api/syslogs", methods=["GET"])
 @login_required
 def api_get_syslogs():
@@ -435,6 +429,26 @@ def api_analyze_syslog_ondemand():
         "ai_cause": ai_cause,
         "ai_suggestion": ai_suggestion
     })
+
+
+@app.route("/api/syslog/status", methods=["GET"])
+@login_required
+def api_syslog_status():
+    """Return the current syslog server status (running, port, count)."""
+    from app.syslog_server import syslog_server_instance
+    status = syslog_server_instance.get_status()
+    return jsonify({"success": True, **status})
+
+
+@app.route("/api/syslog/test", methods=["POST"])
+@login_required
+def api_syslog_test():
+    """Send a test syslog message to verify the pipeline works end-to-end."""
+    from app.syslog_server import syslog_server_instance
+    if not syslog_server_instance.running:
+        return jsonify({"success": False, "message": "Syslog server is not running"}), 503
+    ok, msg = syslog_server_instance.send_test()
+    return jsonify({"success": ok, "message": msg})
 
 
 @app.route("/api/topology", methods=["GET"])
@@ -1488,119 +1502,6 @@ def api_update_user_role(user_id):
 
 
 # ── SocketIO ─────────────────────────────────────────────
-# Active VTY sessions map: sid -> { "net_connect": net_connect, "device": name, "read_thread_running": bool }
-active_terminals = {}
-
-def read_vty_stream(sid, conn):
-    while sid in active_terminals and active_terminals[sid]["read_thread_running"]:
-        try:
-            # Read standard stdout channel without blocking
-            data = conn.read_channel()
-            if data:
-                socketio.emit("terminal_output", {"data": data}, to=sid)
-            socketio.sleep(0.03)  # Yield execution to Socket.IO event loop
-        except Exception:
-            break
-    _cleanup_terminal(sid)
-
-def _cleanup_terminal(sid):
-    if sid in active_terminals:
-        t = active_terminals.pop(sid)
-        t["read_thread_running"] = False
-        try:
-            t["net_connect"].disconnect()
-            log.info(f"🔌 Closed active Web Terminal SSH/Telnet session for sid: {sid}")
-        except Exception:
-            pass
-        socketio.emit("terminal_status", {"status": "disconnected"}, to=sid)
-
-def vty_keepalive_loop():
-    """Background loop sending keep-alives to prevent Cisco exec-timeout from dropping active VTY shells."""
-    while True:
-        socketio.sleep(60)
-        sids = list(active_terminals.keys())
-        for sid in sids:
-            if sid in active_terminals:
-                try:
-                    conn = active_terminals[sid]["net_connect"]
-                    # Send a safe space + backspace sequence to refresh VTY exec-timeout
-                    conn.write_channel(" \b")
-                except Exception:
-                    pass
-
-@socketio.on("terminal_connect")
-def _terminal_connect(data):
-    device_name = data.get("device_name")
-    sid = request.sid
-    
-    if not device_name:
-        socketio.emit("terminal_status", {"status": "error", "message": "Device name required"}, to=sid)
-        return
-
-    # Gracefully close existing session for this socket if any
-    _cleanup_terminal(sid)
-
-    try:
-        # Look up device credentials in local devices config
-        dev = get_device_by_name(device_name)
-            
-        if not dev:
-            socketio.emit("terminal_status", {"status": "error", "message": f"Device {device_name} not registered"}, to=sid)
-            return
-
-        host = dev.get("host")
-        device_type = dev.get("device_type", "cisco_ios")
-        
-        # Load environment variables credentials
-        username = os.getenv("DEVICE_USERNAME", "admin")
-        password = os.getenv("DEVICE_PASSWORD", "admin")
-        secret = os.getenv("DEVICE_SECRET", "admin")
-
-        socketio.emit("terminal_output", {"data": f"\r\nConnecting to {device_name} ({host}) via {device_type}...\r\n"}, to=sid)
-
-        # Connect using Netmiko
-        net_connect = ConnectHandler(
-            device_type=device_type,
-            host=host,
-            username=username,
-            password=password,
-            secret=secret,
-            timeout=10,
-            fast_cli=True
-        )
-        net_connect.enable()
-
-        active_terminals[sid] = {
-            "net_connect": net_connect,
-            "device": device_name,
-            "read_thread_running": True
-        }
-
-        # Start VTY stream reader background task
-        socketio.start_background_task(read_vty_stream, sid, net_connect)
-        socketio.emit("terminal_status", {"status": "connected"}, to=sid)
-        log.info(f"🔌 Established active Web Terminal VTY session to {device_name} for sid: {sid}")
-
-    except Exception as e:
-        log.error(f"Failed terminal connection for {device_name}: {e}")
-        socketio.emit("terminal_output", {"data": f"\r\n❌ Connection failed: {str(e)}\r\n"}, to=sid)
-        socketio.emit("terminal_status", {"status": "error", "message": str(e)}, to=sid)
-
-@socketio.on("terminal_input")
-def _terminal_input(data):
-    sid = request.sid
-    keystroke = data.get("data")
-    if sid in active_terminals and keystroke:
-        try:
-            conn = active_terminals[sid]["net_connect"]
-            conn.write_channel(keystroke)
-        except Exception as e:
-            log.debug(f"Terminal write error: {e}")
-
-@socketio.on("disconnect")
-def _socketio_disconnect_terminal():
-    # Garbage collect terminal session immediately on WebSocket disconnect
-    _cleanup_terminal(request.sid)
 
 def push_anomaly(anomaly):
     socketio.emit("anomaly", anomaly)
@@ -1612,6 +1513,4 @@ def push_device_down(info):
 
 def run_dashboard():
     log.info("Dashboard starting on http://0.0.0.0:5000")
-    # Start the keep-alive task background thread
-    socketio.start_background_task(vty_keepalive_loop)
     socketio.run(app, host="0.0.0.0", port=5000, debug=False, use_reloader=False, log_output=False, allow_unsafe_werkzeug=True)

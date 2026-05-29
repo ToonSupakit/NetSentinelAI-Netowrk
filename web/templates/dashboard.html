@@ -8,55 +8,54 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="/static/theme.css" rel="stylesheet">
+<link href="/static/css/ai-workspace.css" rel="stylesheet">
 <script src="/static/theme.js"></script>
 <link href="/static/sidebar.css" rel="stylesheet">
 <style>
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);display:flex;min-height:100vh}
-.main{flex:1;padding:2.25rem;min-width:0}
-.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem}
-.header h2{font-size:1.25rem;font-weight:700}
-.status-pill{font-size:.8rem;color:var(--txt-m);display:flex;align-items:center;gap:.5rem;background:var(--card);padding:.5rem .8rem;border-radius:999px;border:1px solid var(--brd);box-shadow:var(--shadow-sm)}
-.dot{width:6px;height:6px;background:var(--ok);border-radius:50%;box-shadow:0 0 8px var(--ok)}
-.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1.25rem;margin-bottom:1.5rem}
-.card{background:var(--card);border:1px solid var(--brd);border-radius:8px;padding:1.35rem;box-shadow:var(--shadow-sm)}
-.stat-h{font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;color:var(--txt-m);font-weight:600;margin-bottom:.75rem}
-.stat-v{font-size:2rem;font-weight:700;letter-spacing:-.03em}
-.stat-sub{font-size:.8rem;color:var(--txt-m)}
+body{display:flex;min-height:100vh}
+.main.ns-main{padding:1.75rem 2rem}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem}
+.header h2{font-size:1.125rem;font-weight:600}
+.status-pill{font-size:var(--text-sm);color:var(--txt-m);display:flex;align-items:center;gap:.5rem;padding:.4rem .75rem;border-radius:var(--radius-sm);border:1px solid var(--brd);background:var(--card)}
+.dot{width:6px;height:6px;background:var(--ok);border-radius:50%;animation:pulse 2s infinite;transition:background .3s}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.5)}50%{box-shadow:0 0 0 4px rgba(16,185,129,0)}}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.25rem}
+.card{background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);padding:1.25rem}
+.stat-h{font-size:0.6875rem;text-transform:uppercase;letter-spacing:.04em;color:var(--txt-m);font-weight:600;margin-bottom:.5rem}
+.stat-v{font-size:1.75rem;font-weight:600;letter-spacing:-.02em}
+.stat-sub{font-size:var(--text-sm);color:var(--txt-m);margin-top:.25rem}
 .grid-23{display:grid;grid-template-columns:2fr 1fr;gap:1.25rem;align-items:start}
-.ch{font-size:.95rem;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:.6rem}
-table{width:100%;border-collapse:separate;border-spacing:0;font-size:.82rem}
-th{text-align:left;padding:.75rem;color:var(--txt-m);font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid var(--brd)}
-td{padding:.75rem;border-bottom:1px solid var(--brd-soft);vertical-align:middle}
+.ch{font-size:0.9375rem;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem}
+table{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
+th{text-align:left;padding:.625rem .75rem;color:var(--txt-m);font-weight:600;font-size:0.6875rem;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--brd)}
+td{padding:.625rem .75rem;border-bottom:1px solid var(--brd-soft);vertical-align:middle}
 tr:last-child td{border-bottom:none}
-tr:hover td{background:var(--panel-2)}
-.badge{padding:.2rem .5rem;border-radius:5px;font-size:.7rem;font-weight:500;text-transform:capitalize;border:1px solid transparent}
+.badge{padding:.15rem .45rem;border-radius:4px;font-size:0.6875rem;font-weight:600}
 .b-n,.b-u{background:var(--ok-bg);color:var(--ok)}.b-a,.b-d{background:var(--err-bg);color:var(--err)}
 .lbw{display:flex;align-items:center;gap:.5rem}.lb{flex:1;height:4px;background:var(--brd);border-radius:2px;overflow:hidden}.lbf{height:100%;border-radius:2px;transition:width .3s}
 .bg-ok{background:var(--ok)}.bg-wrn{background:var(--wrn)}.bg-err{background:var(--err)}
-.act-btn{border:none;padding:.3rem .5rem;border-radius:5px;font-size:.65rem;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;margin-right:.25rem}
-.act-fix{background:var(--ok-bg);color:var(--ok);border:1px solid rgba(16,185,129,.3)}.act-fix:hover{background:var(--ok);color:#fff}
-.act-rl{background:var(--wrn-bg);color:var(--wrn);border:1px solid rgba(245,158,11,.3)}.act-rl:hover{background:var(--wrn);color:#fff}
-.feed-wrapper{display:flex;flex-direction:column}
-.feed-filter{display:flex;gap:.4rem;align-items:center;margin-bottom:.75rem}
-.feed-filter input[type="date"]{background:var(--panel-2);border:1px solid var(--brd);color:var(--txt);padding:.35rem .55rem;border-radius:7px;font-family:inherit;font-size:.75rem}
-.feed-filter button{background:var(--ac-bg);color:var(--ac);border:1px solid rgba(99,102,241,.3);padding:.3rem .6rem;border-radius:6px;font-size:.7rem;font-weight:600;cursor:pointer;font-family:inherit}
-.feed{display:flex;flex-direction:column;gap:.75rem;max-height:600px;overflow-y:auto;padding-right:.4rem}
-.feed::-webkit-scrollbar{width:5px}.feed::-webkit-scrollbar-track{background:transparent}.feed::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px}
-.fi{display:flex;gap:.75rem;padding-bottom:.75rem;border-bottom:1px solid var(--brd)}.fi:last-child{border-bottom:none}
-.fs{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex-shrink:0}.fs.a{background:var(--err-bg);color:var(--err)}.fs.o{background:var(--ok-bg);color:var(--ok)}
-.fc{flex:1;min-width:0}.ft{font-weight:600;font-size:.82rem;margin-bottom:.2rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fsu{font-size:.7rem;color:var(--txt-m)}.ftime{font-size:.65rem;color:var(--txt-m);white-space:nowrap}
-.toast{position:fixed;bottom:2rem;right:2rem;background:var(--card);border:1px solid var(--brd);padding:.75rem 1.25rem;border-radius:8px;box-shadow:var(--shadow);display:flex;align-items:center;gap:.75rem;transform:translateY(100px);opacity:0;transition:all .3s cubic-bezier(.16,1,.3,1);z-index:1000}
-.toast.show{transform:translateY(0);opacity:1}
-.t-i{width:20px;height:20px;border-radius:50%;display:grid;place-items:center}.t-i.s{background:var(--ok);color:#fff}.t-i.e{background:var(--err);color:#fff}.t-i.a{background:var(--ac);color:#fff}
+.act-btn{border:none;padding:.35rem .55rem;border-radius:6px;font-size:0.6875rem;font-weight:600;cursor:pointer;margin-right:.25rem}
+.act-fix{background:var(--ok-bg);color:var(--ok)}.act-fix:hover{background:var(--ok);color:#fff}
+.act-rl{background:var(--wrn-bg);color:var(--wrn)}.act-rl:hover{background:var(--wrn);color:#fff}
+.feed-filter{display:flex;gap:.5rem;align-items:center;margin-bottom:.75rem}
+.feed-filter input[type="date"]{background:var(--panel-2);border:1px solid var(--brd);color:var(--txt);padding:.4rem .6rem;border-radius:var(--radius-sm);font-size:var(--text-sm)}
+.feed-filter button{background:var(--panel-2);color:var(--txt);border:1px solid var(--brd);padding:.4rem .65rem;border-radius:var(--radius-sm);font-size:var(--text-sm);font-weight:500;cursor:pointer}
+.feed-filter button:hover{border-color:var(--ac);color:var(--ac)}
+.feed{display:flex;flex-direction:column;gap:.625rem;max-height:560px;overflow-y:auto}
+.fi{display:flex;gap:.75rem}
+.fs{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;flex-shrink:0;font-size:0.75rem}.fs.a{background:var(--err-bg);color:var(--err)}.fs.o{background:var(--ok-bg);color:var(--ok)}
+.fc{flex:1;min-width:0}.ft{font-weight:600;font-size:var(--text-sm);margin-bottom:.15rem}.fsu{font-size:0.75rem;color:var(--txt-m);line-height:1.45}.ftime{font-size:0.75rem;color:var(--txt-m)}
+@media(max-width:1200px){.grid-4{grid-template-columns:repeat(2,1fr)}.grid-23{grid-template-columns:1fr}}
+@media(max-width:640px){.grid-4{grid-template-columns:1fr}.main.ns-main{padding:1.25rem}}
 </style>
 </head>
 <body data-is-admin="{{ 'true' if session.get('role') == 'admin' else 'false' }}">
 
 {% include 'sidebar.html' %}
 
-<div class="main">
+<div class="main ns-main">
   <div class="header">
-    <h2>Dashboard</h2>
+    <h2 class="ns-page-title">Dashboard</h2>
     <div class="status-pill"><div class="dot"></div><span id="last-update">Connecting...</span></div>
   </div>
 
@@ -80,7 +79,7 @@ tr:hover td{background:var(--panel-2)}
         <button onclick="filterByDate()">Filter</button>
         <button onclick="clearFilter()">All</button>
       </div>
-      <div class="feed" id="anomaly-feed"></div>
+      <div class="feed feed-message" id="anomaly-feed"></div>
     </div>
   </div>
 </div>
@@ -312,23 +311,104 @@ const sum=d.summary||[];document.getElementById('c-tot').textContent=(sum[0]!=nu
 const fr=d.fix_rate;const totAnom=fr&&fr[0]!=null?Number(fr[0]):0;
 if(totAnom>0&&fr[2]!=null&&!Number.isNaN(Number(fr[2]))){document.getElementById('c-fix').textContent=fr[2]+'%';document.getElementById('c-fix-s').textContent=(fr[1]!=null?fr[1]:0)+'/'+totAnom+' resolved'}else{document.getElementById('c-fix').textContent='-';document.getElementById('c-fix-s').textContent='No data'}}catch(e){showToast(e.message||'Analytics data unavailable','e')}}
 
-const socket=io();
-socket.on('anomaly',d=>{
-  const msg=d.intf==='ALL'?d.device:d.device+' – '+d.intf;
-  showToast('ANOMALY: '+msg,'e');
+// ── Socket.IO with Stability & Reconnection ──────────────
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 20000
+});
+
+const statusDot = document.querySelector('.dot');
+const statusText = document.getElementById('last-update');
+
+socket.on('connect', () => {
+  statusDot.style.background = 'var(--ok)';
+  statusText.textContent = 'Connected — ' + new Date().toLocaleTimeString('th-TH');
+  refresh();
+});
+
+socket.on('disconnect', (reason) => {
+  statusDot.style.background = 'var(--err)';
+  statusText.textContent = 'Disconnected — reconnecting...';
+});
+
+socket.on('connect_error', () => {
+  statusDot.style.background = 'var(--wrn)';
+  statusText.textContent = 'Connection error — retrying...';
+});
+
+// ── Anomaly & Device Down Events ──────────────────────────
+socket.on('anomaly', d => {
+  const msg = d.intf === 'ALL' ? d.device : d.device + ' – ' + d.intf;
+  showToast('⚠️ ANOMALY: ' + msg, 'e');
   loadFeed();
   loadStatus();
 });
-socket.on('device_down',d=>{showToast('DEVICE DOWN: '+d.device,'e');loadFeed();loadStatus();loadAnalytics()});
-socket.on('remediation_result',d=>{
-  if(d.success){
-    refresh();
-    setTimeout(refresh,3000);
-    setTimeout(refresh,8000);
+
+socket.on('device_down', d => {
+  Swal.fire({
+    icon: 'error',
+    title: '🔴 Device Down!',
+    text: d.device + ' is unreachable',
+    background: themeColor('--card'),
+    color: themeColor('--txt'),
+    confirmButtonColor: '#ef4444',
+    timer: 8000,
+    timerProgressBar: true,
+    toast: false
+  });
+  loadFeed(); loadStatus(); loadAnalytics();
+});
+
+// ── Real-time Syslog Alert (Critical events popup instantly) ──
+const CRITICAL_SEVERITIES = ['Emergency', 'Alert', 'Critical', 'Error'];
+const WARNING_SEVERITIES = ['Warning'];
+
+socket.on('syslog_received', logData => {
+  const sev = logData.severity || '';
+  const device = logData.device_name || 'Unknown';
+  const mnem = logData.mnemonic || '';
+  const msg = logData.message || '';
+
+  if (CRITICAL_SEVERITIES.includes(sev)) {
+    // Critical syslog — big popup + persist in feed
+    Swal.fire({
+      icon: 'error',
+      title: `🚨 ${sev.toUpperCase()} — ${device}`,
+      html: `<div style="text-align:left;font-size:.85rem;line-height:1.6">
+        <b style="color:var(--ac)">%${esc(logData.facility)}-${esc(mnem)}</b><br>
+        ${esc(msg)}<br><br>
+        <span style="color:var(--txt-m);font-size:.75rem">AI: ${esc(logData.ai_cause || 'กำลังวิเคราะห์...')}</span>
+      </div>`,
+      background: themeColor('--card'),
+      color: themeColor('--txt'),
+      confirmButtonColor: '#ef4444',
+      confirmButtonText: 'รับทราบ',
+      timer: 15000,
+      timerProgressBar: true,
+    });
+  } else if (WARNING_SEVERITIES.includes(sev)) {
+    // Warning — toast
+    Toast.fire({ icon: 'warning', title: `⚠️ ${device}: %${mnem}`, timer: 6000 });
+  } else {
+    // Notice/Info/Debug — subtle toast
+    Toast.fire({ icon: 'info', title: `📋 ${device}: %${mnem}`, timer: 3000 });
   }
 });
-async function refresh(){await Promise.all([loadStatus(),loadFeed(),loadAnalytics()])}
-refresh();setInterval(refresh,10000);
+
+socket.on('remediation_result', d => {
+  if (d.success) {
+    refresh();
+    setTimeout(refresh, 3000);
+    setTimeout(refresh, 8000);
+  }
+});
+
+async function refresh() { await Promise.all([loadStatus(), loadFeed(), loadAnalytics()]) }
+refresh(); setInterval(refresh, 10000);
 </script>
 </body>
 </html>
+

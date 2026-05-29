@@ -1,7 +1,10 @@
 # Secrets — ห้ามขึ้น git เด็ดขาด
 .env
-config.yaml
-devices.yaml
+config/config.yaml
+config/devices.yaml
+config/.env.example
+config/config.example.yaml
+config/devices.example.yaml
 
 # Python
 __pycache__/
@@ -9,11 +12,21 @@ __pycache__/
 *.pyo
 
 # AI Model
+models/
 *.pkl
 
 # Logs
+logs/
 *.log
+netsentinel.db
 
 # IDE
 .vscode/
 .idea/
+.cursor/
+.claude
+.codegraph
+
+# Cache
+.pytest_cache/
+.ruff_cache/

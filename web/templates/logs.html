@@ -8,70 +8,244 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="/static/theme.css" rel="stylesheet">
+<link href="/static/css/ai-workspace.css" rel="stylesheet">
 <script src="/static/theme.js"></script>
 <link href="/static/sidebar.css" rel="stylesheet">
 <style>
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--txt);display:flex;min-height:100vh}
-.main{flex:1;padding:2.25rem;min-width:0;display:flex;flex-direction:column;gap:1.5rem}
-.header{display:flex;justify-content:space-between;align-items:center}
-.header h2{font-size:1.25rem;font-weight:700}
-.grid-layout {display:grid;grid-template-columns:2fr 1fr;gap:1.5rem;align-items:start}
-.card{background:var(--card);border:1px solid var(--brd);border-radius:12px;padding:1.5rem;box-shadow:var(--shadow-sm);transition:all 0.3s ease}
-.card h3{font-size:1rem;font-weight:700;margin-bottom:1.25rem;display:flex;align-items:center;gap:0.6rem}
-.tools{display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1.25rem}
-.select, .input{background:var(--panel-2);border:1px solid var(--brd);color:var(--txt);border-radius:8px;font-family:inherit;font-size:0.82rem;height:38px;padding:0 0.75rem;transition:all 0.2s}
-.select:focus, .input:focus{outline:none;border-color:var(--ac);box-shadow:var(--focus)}
-.input{flex:1;min-width:180px}
-.btn{background:var(--ac);color:#fff;border:none;padding:0 1.25rem;border-radius:8px;font-weight:600;font-size:0.82rem;height:38px;cursor:pointer;transition:all 0.2s;display:inline-flex;align-items:center;gap:0.5rem;font-family:inherit}
-.btn:hover{background:var(--ac-h)}
-.btn-secondary {background:var(--panel-2);color:var(--txt);border:1px solid var(--brd)}
-.btn-secondary:hover {background:var(--brd-soft)}
+body{display:flex;min-height:100vh}
+.logs-page .main{display:flex;flex-direction:column}
+.logs-page .header{display:flex;align-items:center}
+.logs-page .card h3{display:flex;align-items:center;gap:0.5rem}
+.logs-page .tools{display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap}
+.logs-page .select,.logs-page .input{background:var(--panel-2);border:1px solid var(--brd);color:var(--txt)}
+.logs-page .select:focus,.logs-page .input:focus{outline:none;border-color:var(--ac);box-shadow:var(--focus)}
+.logs-page .input{flex:1;min-width:160px}
+.logs-page .btn{background:var(--ac);color:#fff;border:none;padding:0 1rem;display:inline-flex;align-items:center;gap:0.4rem}
+.logs-page .btn:hover{background:var(--ac-h)}
+.logs-page .btn-secondary{background:var(--card);color:var(--txt-m);border:1px solid var(--brd)}
+.logs-page .btn-secondary:hover{background:var(--panel-2);color:var(--txt)}
+.logs-page .table-wrap{overflow-x:auto;border:1px solid var(--brd);background:var(--card)}
+.logs-page table{width:100%;border-collapse:collapse}
+.logs-page th{text-align:left;border-bottom:1px solid var(--brd)}
+.logs-page td{border-bottom:1px solid var(--brd-soft);vertical-align:top}
+.logs-page tr:last-child td{border-bottom:none}
+.logs-page .badge{padding:0.15rem 0.45rem;border-radius:4px;font-size:0.6875rem;font-weight:600}
+.logs-page .badge-emergency,.logs-page .badge-alert,.logs-page .badge-critical,.logs-page .badge-error{background:var(--err-bg);color:var(--err)}
+.logs-page .badge-warning{background:var(--wrn-bg);color:var(--wrn)}
+.logs-page .badge-notice,.logs-page .badge-informational,.logs-page .badge-info{background:var(--ok-bg);color:var(--ok)}
+.logs-page .badge-debug{background:var(--panel-2);color:var(--txt-m)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:none;align-items:center;justify-content:center;padding:1.25rem}
+.modal-container{background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);width:100%;max-width:560px}
+.modal-header{padding:1rem 1.25rem;border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center}
+.modal-title{font-weight:600;font-size:1rem}
+.modal-close{background:none;border:none;color:var(--txt-m);cursor:pointer;padding:6px;border-radius:6px}
+.modal-close:hover{background:var(--panel-2);color:var(--txt)}
+.modal-body{display:flex;flex-direction:column;gap:0.75rem}
+.modal-field-content{white-space:pre-wrap}
 
-/* Table Styling */
-.table-wrap{overflow-x:auto;border:1px solid var(--brd-soft);border-radius:8px;background:var(--panel-2)}
-table{width:100%;border-collapse:separate;border-spacing:0;font-size:0.82rem}
-th{text-align:left;padding:0.75rem 1rem;color:var(--txt-m);font-weight:600;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--brd)}
-td{padding:0.75rem 1rem;border-bottom:1px solid var(--brd-soft);vertical-align:middle;white-space:nowrap}
-tr:last-child td{border-bottom:none}
-tr:hover td{background:var(--card)}
+/* ── Syslog Status Banner ── */
+.syslog-status-banner{
+  position:relative;
+  background:linear-gradient(135deg, rgba(var(--glass-r,23),var(--glass-g,26),var(--glass-b,33),.72), rgba(var(--glass-r,23),var(--glass-g,26),var(--glass-b,33),.52));
+  backdrop-filter:blur(16px) saturate(1.6);
+  -webkit-backdrop-filter:blur(16px) saturate(1.6);
+  border:1px solid var(--brd);
+  border-radius:var(--radius);
+  padding:1rem 1.25rem;
+  margin-bottom:0.75rem;
+  display:flex;
+  align-items:center;
+  gap:1rem;
+  flex-wrap:wrap;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.syslog-status-banner::before{
+  content:'';
+  position:absolute;
+  inset:0;
+  background:linear-gradient(135deg, var(--ac-bg), transparent 60%);
+  pointer-events:none;
+  border-radius:var(--radius);
+}
+.syslog-status-banner>*{position:relative;z-index:1}
 
-/* Badges for severity */
-.badge {padding:0.2rem 0.5rem;border-radius:5px;font-size:0.68rem;font-weight:600;text-transform:uppercase}
-.badge-emergency, .badge-alert, .badge-critical, .badge-error{background:var(--err-bg);color:var(--err);border:1px solid rgba(239,68,68,0.2)}
-.badge-warning{background:var(--wrn-bg);color:var(--wrn);border:1px solid rgba(245,158,11,0.2)}
-.badge-notice, .badge-informational, .badge-info{background:var(--ok-bg);color:var(--ok);border:1px solid rgba(16,185,129,0.2)}
-.badge-debug{background:var(--panel-2);color:var(--txt-m);border:1px solid var(--brd)}
+.status-indicator{
+  display:flex;
+  align-items:center;
+  gap:0.6rem;
+  font-weight:600;
+  font-size:0.9rem;
+  white-space:nowrap;
+}
+.status-dot{
+  width:10px;height:10px;border-radius:50%;
+  flex-shrink:0;
+  background:var(--txt-m);
+  transition:background .3s ease;
+}
+.status-dot.online{background:var(--ok)}
+.status-dot.offline{background:var(--err)}
+.status-dot.reconnecting{background:var(--wrn)}
 
-/* Sandbox Area */
-.sandbox-textarea{width:100%;background:var(--panel-2);border:1px solid var(--brd);color:var(--txt);border-radius:8px;padding:0.75rem;font-family:monospace;font-size:0.8rem;resize:vertical;min-height:100px;margin-bottom:0.75rem;transition:all 0.2s}
-.sandbox-textarea:focus{outline:none;border-color:var(--ac);box-shadow:var(--focus)}
+@keyframes pulse-ring{
+  0%{box-shadow:0 0 0 0 rgba(var(--ok-rgb,5,150,105),.45)}
+  70%{box-shadow:0 0 0 7px rgba(var(--ok-rgb,5,150,105),0)}
+  100%{box-shadow:0 0 0 0 rgba(var(--ok-rgb,5,150,105),0)}
+}
+.status-dot.online{animation:pulse-ring 2s ease-out infinite}
 
-/* Modal Viewer */
-.modal-overlay {position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:9999;display:none;align-items:center;justify-content:center;padding:2rem;animation:fadeIn 0.25s ease}
-.modal-container {background:var(--card);border:1px solid var(--brd);border-radius:12px;width:100%;max-width:650px;box-shadow:var(--shadow);overflow:hidden;animation:slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)}
-.modal-header {padding:1.25rem 1.5rem;border-bottom:1px solid var(--brd);display:flex;justify-content:space-between;align-items:center}
-.modal-title {font-weight:700;font-size:1.05rem}
-.modal-close {background:none;border:none;color:var(--txt-m);cursor:pointer;padding:4px;border-radius:50%;display:grid;place-items:center;transition:all 0.2s}
-.modal-close:hover {background:var(--panel-2);color:var(--txt)}
-.modal-body {padding:1.5rem;display:flex;flex-direction:column;gap:1.25rem}
-.modal-field {background:var(--panel-2);border:1px solid var(--brd-soft);border-radius:8px;padding:1rem}
-.modal-field-title {font-size:0.72rem;font-weight:700;text-transform:uppercase;color:var(--txt-m);margin-bottom:0.45rem;letter-spacing:0.04em}
-.modal-field-content {font-size:0.85rem;line-height:1.5;white-space:pre-wrap}
+.status-meta{
+  display:flex;
+  align-items:center;
+  gap:0.75rem;
+  font-size:var(--text-sm);
+  color:var(--txt-m);
+  margin-left:auto;
+  flex-wrap:wrap;
+}
+.status-meta .msg-count{
+  display:inline-flex;
+  align-items:center;
+  gap:0.35rem;
+  background:var(--panel-2);
+  padding:0.2rem 0.6rem;
+  border-radius:var(--radius-sm);
+  font-weight:500;
+  font-variant-numeric:tabular-nums;
+}
+.banner-actions{display:flex;gap:0.4rem;flex-shrink:0}
+.banner-actions .btn{
+  height:32px;padding:0 0.75rem;border-radius:var(--radius-sm);
+  font-size:0.78rem;font-weight:600;
+}
+.banner-actions .btn-test{
+  background:var(--ok-bg);color:var(--ok);border:1px solid transparent;
+}
+.banner-actions .btn-test:hover{background:var(--ok);color:#fff}
+.banner-actions .btn-refresh{
+  background:var(--panel-2);color:var(--txt-m);border:1px solid var(--brd);
+}
+.banner-actions .btn-refresh:hover{background:var(--panel-2);color:var(--txt);border-color:var(--ac)}
 
-@keyframes fadeIn { from{opacity:0} to{opacity:1} }
-@keyframes slideUp { from{transform:translateY(20px)} to{transform:translateY(0)} }
+.reconnect-tag{
+  display:none;
+  align-items:center;gap:0.35rem;
+  font-size:0.75rem;font-weight:600;
+  color:var(--wrn);
+  animation:blink 1.2s ease-in-out infinite;
+}
+.reconnect-tag.active{display:inline-flex}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ── Router Config Help ── */
+.config-help{
+  background:var(--panel-2);
+  border:1px solid var(--brd);
+  border-radius:var(--radius);
+  margin-bottom:0.75rem;
+  overflow:hidden;
+}
+.config-help-toggle{
+  width:100%;
+  background:none;border:none;
+  padding:0.65rem 1rem;
+  display:flex;align-items:center;gap:0.5rem;
+  font-size:var(--text-sm);font-weight:600;
+  color:var(--txt-m);cursor:pointer;
+  transition:color .15s;
+}
+.config-help-toggle:hover{color:var(--txt)}
+.config-help-toggle svg{transition:transform .2s ease}
+.config-help-toggle.open svg{transform:rotate(90deg)}
+.config-help-body{
+  display:none;
+  padding:0 1rem 0.85rem 1rem;
+}
+.config-help-body.open{display:block}
+.config-help-body pre{
+  background:var(--card);
+  border:1px solid var(--brd);
+  border-radius:var(--radius-sm);
+  padding:0.75rem 1rem;
+  font-family:ui-monospace,'Cascadia Code','Fira Code',monospace;
+  font-size:0.8rem;
+  line-height:1.7;
+  color:var(--txt);
+  overflow-x:auto;
+  white-space:pre-wrap;
+  word-break:break-all;
+}
+.config-help-body pre .hl{color:var(--ac);font-weight:600}
+.config-help-body .hint{font-size:0.75rem;color:var(--txt-m);margin-top:0.5rem}
+
+/* ── Row animations ── */
+@keyframes fadeIn{
+  from{opacity:0;transform:translateY(-6px)}
+  to{opacity:1;transform:translateY(0)}
+}
+@keyframes rowGlow{
+  0%{background:transparent}
+  30%{background:var(--ac-bg)}
+  100%{background:transparent}
+}
+.row-new{animation:fadeIn .4s ease, rowGlow 1.5s ease}
 </style>
 </head>
-<body>
+<body class="logs-page">
 
 {% include 'sidebar.html' %}
 
-<div class="main">
+<div class="main ns-main">
   <div class="header">
-    <h2>System Logs</h2>
+    <h2 class="ns-page-title">System Logs</h2>
   </div>
 
   <div class="grid-layout">
+
+    <!-- ── Syslog Status Banner ── -->
+    <div class="syslog-status-banner" id="syslog-banner">
+      <div class="status-indicator">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-label">Syslog Server: Checking…</span>
+      </div>
+      <span class="reconnect-tag" id="reconnect-tag">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        Reconnecting…
+      </span>
+      <div class="status-meta">
+        <span class="msg-count" id="msg-count">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          <span id="msg-count-num">—</span> messages
+        </span>
+      </div>
+      <div class="banner-actions">
+        <button class="btn btn-test" onclick="sendTestSyslog()" title="Send a test syslog message">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Test Syslog
+        </button>
+        <button class="btn btn-refresh" onclick="refreshSyslogStatus()" title="Refresh syslog server status">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Router Configuration Help ── -->
+    <div class="config-help" id="config-help">
+      <button class="config-help-toggle" id="config-toggle" onclick="toggleConfigHelp()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+        Router Configuration Guide
+      </button>
+      <div class="config-help-body" id="config-body">
+        <pre><span class="hl">! Cisco IOS — Send syslogs to NetSentinel</span>
+R2(config)# logging host <span class="hl">&lt;YOUR_SERVER_IP&gt;</span> transport udp port <span class="hl" id="cfg-port">514</span>
+R2(config)# logging trap informational
+R2(config)# service timestamps log datetime msec</pre>
+        <div class="hint">Replace <strong>&lt;YOUR_SERVER_IP&gt;</strong> with the IP address of this NetSentinel server. The port shown above is auto-detected from the running syslog server.</div>
+      </div>
+    </div>
+
     <!-- Real-time Flowing Syslogs -->
     <div class="card" style="margin-bottom: 0;">
       <h3>
@@ -93,7 +267,7 @@ tr:hover td{background:var(--card)}
           <option value="Informational">Informational</option>
           <option value="Debug">Debug</option>
         </select>
-        <input type="text" class="input" id="search-log" placeholder="Search logs (e.g. OSPF, changed state)..." oninput="fetchSyslogs()">
+        <input type="text" class="input" id="search-log" placeholder="ค้นหา log…" oninput="fetchSyslogs()">
         <button class="btn btn-secondary" onclick="clearFilters()">Reset</button>
       </div>
 
@@ -118,42 +292,51 @@ tr:hover td{background:var(--card)}
       </div>
     </div>
 
-    <!-- On-Demand AI Sandbox Analyzer -->
-    <div class="card">
-      <h3>
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--wrn)" stroke-width="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-        AI Sandbox Analyzer
-      </h3>
-      <p style="font-size: 0.76rem; color: var(--txt-m); margin-bottom: 0.85rem; line-height: 1.45;">Paste any raw network syslog or CLI output below, and let the NetSentinel AI analyze and explain its root cause and recommended actions.</p>
-      <textarea class="sandbox-textarea" id="sandbox-input" placeholder="Paste syslog here... (e.g., %OSPF-5-ADJCHG: Process 1, Nbr 192.168.1.1 on GigabitEthernet0/1 from FULL to DOWN, Neighbor Down: Dead timer expired)"></textarea>
-      <button class="btn" style="width: 100%;" onclick="runSandboxAnalysis()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        Analyze Log
-      </button>
+    <!-- AI Workspace — visual shell; same IDs & handlers -->
+    <div class="card ai-workspace">
+      <div class="ai-ws-header">
+        <h3>AI Log Analyzer</h3>
+        <p>วาง syslog แล้วกดส่ง — ระบบจะอธิบายสาเหตุและวิธีแก้</p>
+      </div>
+      <p class="ai-ws-hint">ตัวอย่าง: %LINK-3-UPDOWN, %OSPF-5-ADJCHG</p>
+      <div class="ai-chat-feed" id="ai-chat-feed" aria-live="polite">
+        <div class="ai-bubble ai-bubble-system">
+          <div class="ai-bubble-label">คำแนะนำ</div>
+          วางข้อความ log ด้านล่าง แล้วกดปุ่มส่งเพื่อวิเคราะห์
+        </div>
+      </div>
+      <div class="ai-composer">
+        <div class="ai-composer-inner">
+          <textarea class="sandbox-textarea ai-composer-input" id="sandbox-input" placeholder="วาง syslog ที่นี่…" rows="3"></textarea>
+          <button type="button" class="ai-send-btn" onclick="runSandboxAnalysis()" aria-label="วิเคราะห์ log" title="ส่งวิเคราะห์">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
 
 <!-- AI Insight Details Modal -->
-<div class="modal-overlay" id="insight-modal">
+<div class="modal-overlay ai-insight-modal" id="insight-modal">
   <div class="modal-container">
     <div class="modal-header">
       <span class="modal-title" id="insight-modal-title">AI Log Diagnostics</span>
-      <button class="modal-close" onclick="closeModal('insight-modal')">
+      <button type="button" class="modal-close" onclick="closeModal('insight-modal')" aria-label="Close">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
     <div class="modal-body">
-      <div class="modal-field">
-        <div class="modal-field-title">Original Log Entry</div>
-        <div class="modal-field-content" id="insight-log-entry" style="font-family: monospace; font-size: 0.78rem;"></div>
+      <div class="modal-field modal-field-log">
+        <div class="modal-field-title">Log ต้นฉบับ</div>
+        <div class="modal-field-content" id="insight-log-entry" style="font-family:ui-monospace,monospace;font-size:0.8125rem;"></div>
       </div>
-      <div class="modal-field" style="border-left: 4px solid var(--ac);">
-        <div class="modal-field-title">AI Root Cause Analysis (สาเหตุหลัก)</div>
+      <div class="modal-field modal-field-cause">
+        <div class="modal-field-title">สาเหตุ</div>
         <div class="modal-field-content" id="insight-ai-cause"></div>
       </div>
-      <div class="modal-field" style="border-left: 4px solid var(--ok);">
-        <div class="modal-field-title">AI Recommended Troubleshooting (คำแนะนำแก้ไข)</div>
+      <div class="modal-field modal-field-fix">
+        <div class="modal-field-title">วิธีแก้ไข</div>
         <div class="modal-field-content" id="insight-ai-suggestion"></div>
       </div>
     </div>
@@ -164,7 +347,94 @@ tr:hover td{background:var(--card)}
 function csrfHeaders(extra={}){return {'X-CSRF-Token':document.querySelector('meta[name="csrf-token"]').content,...extra}}
 const socket = io();
 
-// Fetch devices list for filter dropdown
+/* ================================================================
+   1.  SYSLOG SERVER STATUS BANNER
+   ================================================================ */
+let syslogStatusTimer = null;
+
+async function refreshSyslogStatus() {
+  const dot   = document.getElementById('status-dot');
+  const label = document.getElementById('status-label');
+  const count = document.getElementById('msg-count-num');
+  const cfgPort = document.getElementById('cfg-port');
+
+  try {
+    const r = await fetch('/api/syslog/status');
+    const d = await r.json();
+
+    if (d.success && d.running) {
+      dot.className   = 'status-dot online';
+      label.textContent = `Syslog Server: Online (UDP Port ${d.port})`;
+      count.textContent = d.received_count ?? 0;
+      if (cfgPort) cfgPort.textContent = d.port;
+    } else {
+      dot.className   = 'status-dot offline';
+      label.textContent = 'Syslog Server: Offline';
+      count.textContent = d.received_count ?? '—';
+      if (d.bind_error) {
+        label.textContent += ` — ${d.bind_error}`;
+      }
+    }
+  } catch (e) {
+    dot.className   = 'status-dot offline';
+    label.textContent = 'Syslog Server: Unreachable';
+    console.warn('Syslog status fetch failed', e);
+  }
+}
+
+async function sendTestSyslog() {
+  try {
+    const r = await fetch('/api/syslog/test', {
+      method: 'POST',
+      headers: csrfHeaders({'Content-Type':'application/json'})
+    });
+    const d = await r.json();
+
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'bottom-end',
+      showConfirmButton: false,
+      timer: 3000,
+      timerProgressBar: true,
+      background: themeColor('--card'),
+      color: themeColor('--txt')
+    });
+
+    if (d.success) {
+      Toast.fire({ icon:'success', title: d.message || 'Test syslog sent!' });
+    } else {
+      Toast.fire({ icon:'error', title: d.message || 'Failed to send test syslog' });
+    }
+  } catch (e) {
+    Swal.fire({
+      icon: 'error',
+      title: 'Test Failed',
+      text: e.message,
+      background: themeColor('--card'),
+      color: themeColor('--txt'),
+      confirmButtonColor: themeColor('--err')
+    });
+  }
+}
+
+function startStatusAutoRefresh() {
+  if (syslogStatusTimer) clearInterval(syslogStatusTimer);
+  syslogStatusTimer = setInterval(refreshSyslogStatus, 10000);
+}
+
+/* ================================================================
+   2.  ROUTER CONFIG HELP — collapsible
+   ================================================================ */
+function toggleConfigHelp() {
+  const btn  = document.getElementById('config-toggle');
+  const body = document.getElementById('config-body');
+  const open = btn.classList.toggle('open');
+  body.classList.toggle('open', open);
+}
+
+/* ================================================================
+   3.  DEVICES FILTER
+   ================================================================ */
 async function loadDevicesFilter() {
   try {
     const r = await fetch('/api/settings/devices');
@@ -184,7 +454,9 @@ async function loadDevicesFilter() {
   }
 }
 
-// Fetch historical syslogs with filter parameters
+/* ================================================================
+   4.  FETCH & RENDER SYSLOGS
+   ================================================================ */
 async function fetchSyslogs() {
   const device = document.getElementById('filter-device').value;
   const severity = document.getElementById('filter-severity').value;
@@ -212,47 +484,53 @@ function renderLogsTable(logs) {
   }
 
   logs.forEach(log => {
-    const tr = document.createElement('tr');
-    
-    const tdTime = document.createElement('td');
-    tdTime.textContent = log.received_at;
-    tdTime.style.color = 'var(--txt-m)';
-    
-    const tdDevice = document.createElement('td');
-    tdDevice.textContent = log.device_name;
-    tdDevice.style.fontWeight = '700';
-    
-    const tdSeverity = document.createElement('td');
-    const sevClass = `badge badge-${log.severity.toLowerCase()}`;
-    tdSeverity.innerHTML = `<span class="${sevClass}">${log.severity}</span>`;
-    
-    const tdMnem = document.createElement('td');
-    tdMnem.style.fontFamily = 'monospace';
-    tdMnem.innerHTML = `<span style="color:var(--ac); font-weight:600;">%${log.facility}-${log.mnemonic}</span>`;
-    
-    const tdMsg = document.createElement('td');
-    tdMsg.textContent = log.message;
-    tdMsg.style.maxWidth = '250px';
-    tdMsg.style.overflow = 'hidden';
-    tdMsg.style.textOverflow = 'ellipsis';
-    
-    const tdAction = document.createElement('td');
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-secondary btn-sm';
-    btn.style.cssText = 'height: 28px; padding: 0 0.65rem; font-size: 0.72rem;';
-    btn.textContent = 'AI Insights';
-    btn.onclick = () => showInsightModal(log);
-    tdAction.appendChild(btn);
-
-    tr.appendChild(tdTime);
-    tr.appendChild(tdDevice);
-    tr.appendChild(tdSeverity);
-    tr.appendChild(tdMnem);
-    tr.appendChild(tdMsg);
-    tr.appendChild(tdAction);
-    
-    tbody.appendChild(tr);
+    tbody.appendChild(buildLogRow(log, false));
   });
+}
+
+/** Shared row builder — `isNew` adds the glow + fadeIn animation */
+function buildLogRow(log, isNew) {
+  const tr = document.createElement('tr');
+  if (isNew) tr.className = 'row-new';
+
+  const tdTime = document.createElement('td');
+  tdTime.textContent = log.received_at;
+  tdTime.style.color = 'var(--txt-m)';
+  
+  const tdDevice = document.createElement('td');
+  tdDevice.textContent = log.device_name;
+  tdDevice.style.fontWeight = '700';
+  
+  const tdSeverity = document.createElement('td');
+  const sevClass = `badge badge-${log.severity.toLowerCase()}`;
+  tdSeverity.innerHTML = `<span class="${sevClass}">${log.severity}</span>`;
+  
+  const tdMnem = document.createElement('td');
+  tdMnem.style.fontFamily = 'monospace';
+  tdMnem.innerHTML = `<span style="color:var(--ac); font-weight:600;">%${log.facility}-${log.mnemonic}</span>`;
+  
+  const tdMsg = document.createElement('td');
+  tdMsg.textContent = log.message;
+  tdMsg.style.maxWidth = '250px';
+  tdMsg.style.overflow = 'hidden';
+  tdMsg.style.textOverflow = 'ellipsis';
+  
+  const tdAction = document.createElement('td');
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-secondary btn-sm';
+  btn.style.cssText = 'height: 28px; padding: 0 0.65rem; font-size: 0.72rem;';
+  btn.textContent = 'AI Insights';
+  btn.onclick = () => showInsightModal(log);
+  tdAction.appendChild(btn);
+
+  tr.appendChild(tdTime);
+  tr.appendChild(tdDevice);
+  tr.appendChild(tdSeverity);
+  tr.appendChild(tdMnem);
+  tr.appendChild(tdMsg);
+  tr.appendChild(tdAction);
+
+  return tr;
 }
 
 function clearFilters() {
@@ -262,6 +540,9 @@ function clearFilters() {
   fetchSyslogs();
 }
 
+/* ================================================================
+   5.  AI INSIGHT MODAL
+   ================================================================ */
 function showInsightModal(logEntry) {
   document.getElementById('insight-modal-title').textContent = `${logEntry.device_name} — Log Diagnostics`;
   document.getElementById('insight-log-entry').textContent = `%${logEntry.facility}-${logEntry.severity.toUpperCase()}-${logEntry.mnemonic}: ${logEntry.message}`;
@@ -270,7 +551,9 @@ function showInsightModal(logEntry) {
   showModal('insight-modal');
 }
 
-// On-demand AI Sandbox analysis
+/* ================================================================
+   6.  AI SANDBOX ANALYSIS
+   ================================================================ */
 async function runSandboxAnalysis() {
   const textInput = document.getElementById('sandbox-input').value.trim();
   if (!textInput) {
@@ -331,6 +614,9 @@ async function runSandboxAnalysis() {
   }
 }
 
+/* ================================================================
+   7.  MODALS
+   ================================================================ */
 function showModal(id) {
   document.getElementById(id).style.display = 'flex';
 }
@@ -338,12 +624,86 @@ function closeModal(id) {
   document.getElementById(id).style.display = 'none';
 }
 
-// Real-time Socket.IO streaming event listener
+/* ================================================================
+   8.  TOAST NOTIFICATIONS FOR INCOMING SYSLOG
+   ================================================================ */
+function severityToastConfig(severity) {
+  const sev = (severity || '').toLowerCase();
+  const critical = ['emergency','alert','critical','error'];
+  const warning  = ['warning'];
+  // everything else is informational/debug/notice
+
+  if (critical.includes(sev)) {
+    return {
+      icon: 'error',
+      timer: 8000,
+      iconColor: themeColor('--err'),
+      customClass: { popup: 'toast-critical' },
+      width: 380
+    };
+  }
+  if (warning.includes(sev)) {
+    return {
+      icon: 'warning',
+      timer: 5000,
+      iconColor: themeColor('--wrn'),
+      customClass: { popup: 'toast-warning' },
+      width: 340
+    };
+  }
+  return {
+    icon: 'info',
+    timer: 3000,
+    iconColor: themeColor('--ac'),
+    customClass: { popup: 'toast-info' },
+    width: 320
+  };
+}
+
+function showSyslogToast(logData) {
+  const cfg = severityToastConfig(logData.severity);
+
+  const Toast = Swal.mixin({
+    toast: true,
+    position: 'bottom-end',
+    showConfirmButton: false,
+    timerProgressBar: true,
+    background: themeColor('--card'),
+    color: themeColor('--txt'),
+    didOpen: (toast) => {
+      toast.addEventListener('mouseenter', Swal.stopTimer);
+      toast.addEventListener('mouseleave', Swal.resumeTimer);
+    }
+  });
+
+  const device   = logData.device_name || 'Unknown';
+  const mnemonic = logData.mnemonic    || '—';
+  const sev      = logData.severity    || 'Info';
+
+  Toast.fire({
+    ...cfg,
+    title: `${device}`,
+    html: `<span style="font-family:monospace;font-weight:600;color:${themeColor('--ac')}">%${logData.facility || '?'}-${mnemonic}</span>
+           <span style="margin-left:0.4rem" class="badge badge-${sev.toLowerCase()}">${sev}</span>`
+  });
+}
+
+/* ================================================================
+   9.  SOCKET.IO — REAL-TIME STREAMING + RECONNECTION
+   ================================================================ */
 socket.on('syslog_received', (logData) => {
+  // -- Toast notification --
+  showSyslogToast(logData);
+
+  // -- Update message count in banner --
+  const countEl = document.getElementById('msg-count-num');
+  const cur = parseInt(countEl.textContent, 10);
+  if (!isNaN(cur)) countEl.textContent = cur + 1;
+
+  // -- Check filters --
   const currentDevice = document.getElementById('filter-device').value;
   const currentSeverity = document.getElementById('filter-severity').value;
   
-  // Verify if streaming log matches currently selected filters before injecting
   if (currentDevice !== 'all' && logData.device_name !== currentDevice) return;
   if (currentSeverity !== 'all' && logData.severity !== currentSeverity) return;
   
@@ -354,46 +714,7 @@ socket.on('syslog_received', (logData) => {
     tbody.innerHTML = '';
   }
 
-  const tr = document.createElement('tr');
-  tr.style.animation = 'fadeIn 0.4s ease';
-  
-  const tdTime = document.createElement('td');
-  tdTime.textContent = logData.received_at;
-  tdTime.style.color = 'var(--txt-m)';
-  
-  const tdDevice = document.createElement('td');
-  tdDevice.textContent = logData.device_name;
-  tdDevice.style.fontWeight = '700';
-  
-  const tdSeverity = document.createElement('td');
-  const sevClass = `badge badge-${logData.severity.toLowerCase()}`;
-  tdSeverity.innerHTML = `<span class="${sevClass}">${logData.severity}</span>`;
-  
-  const tdMnem = document.createElement('td');
-  tdMnem.style.fontFamily = 'monospace';
-  tdMnem.innerHTML = `<span style="color:var(--ac); font-weight:600;">%${logData.facility}-${logData.mnemonic}</span>`;
-  
-  const tdMsg = document.createElement('td');
-  tdMsg.textContent = logData.message;
-  tdMsg.style.maxWidth = '250px';
-  tdMsg.style.overflow = 'hidden';
-  tdMsg.style.textOverflow = 'ellipsis';
-  
-  const tdAction = document.createElement('td');
-  const btn = document.createElement('button');
-  btn.className = 'btn btn-secondary btn-sm';
-  btn.style.cssText = 'height: 28px; padding: 0 0.65rem; font-size: 0.72rem;';
-  btn.textContent = 'AI Insights';
-  btn.onclick = () => showInsightModal(logData);
-  tdAction.appendChild(btn);
-
-  tr.appendChild(tdTime);
-  tr.appendChild(tdDevice);
-  tr.appendChild(tdSeverity);
-  tr.appendChild(tdMnem);
-  tr.appendChild(tdMsg);
-  tr.appendChild(tdAction);
-
+  const tr = buildLogRow(logData, true);
   tbody.insertBefore(tr, tbody.firstChild);
   
   // Cap visible table rows to 100 to protect browser memory
@@ -402,10 +723,40 @@ socket.on('syslog_received', (logData) => {
   }
 });
 
-// Setup on DOM Load
+/* ── Socket.IO reconnection handling ── */
+socket.on('disconnect', (reason) => {
+  console.warn('Socket.IO disconnected:', reason);
+  document.getElementById('reconnect-tag').classList.add('active');
+  const dot = document.getElementById('status-dot');
+  dot.classList.remove('online','offline');
+  dot.classList.add('reconnecting');
+});
+
+socket.on('connect', () => {
+  console.log('Socket.IO connected');
+  document.getElementById('reconnect-tag').classList.remove('active');
+  // Refresh everything on reconnect
+  refreshSyslogStatus();
+  fetchSyslogs();
+});
+
+socket.on('connect_error', (err) => {
+  console.error('Socket.IO connect error:', err.message);
+  document.getElementById('reconnect-tag').classList.add('active');
+  const dot = document.getElementById('status-dot');
+  dot.classList.remove('online','reconnecting');
+  dot.classList.add('offline');
+  document.getElementById('status-label').textContent = 'Syslog Server: Connection Error';
+});
+
+/* ================================================================
+   10. INIT
+   ================================================================ */
 document.addEventListener('DOMContentLoaded', () => {
   loadDevicesFilter();
   fetchSyslogs();
+  refreshSyslogStatus();
+  startStatusAutoRefresh();
 });
 </script>
 </body>

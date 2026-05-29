@@ -31,10 +31,6 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
       <span class="nav-text">Config Backups</span>
     </a>
-    <a href="/terminal" data-tooltip="Web Console" id="nav-terminal">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-      <span class="nav-text">Web Console</span>
-    </a>
     <a href="/settings" data-tooltip="Settings" id="nav-settings">
       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
       <span class="nav-text">Settings</span>
@@ -61,7 +57,7 @@
 <script>
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed')}
 // Highlight active nav
-(function(){const p=location.pathname;const map={'/':"nav-dashboard",'/traffic':"nav-traffic",'/topology':"nav-topology",'/settings':"nav-settings",'/backups':"nav-backups",'/logs':"nav-logs",'/terminal':"nav-terminal"};const id=map[p];if(id)document.getElementById(id).classList.add('active')})();
+(function(){const p=location.pathname;const map={'/':"nav-dashboard",'/traffic':"nav-traffic",'/topology':"nav-topology",'/settings':"nav-settings",'/backups':"nav-backups",'/logs':"nav-logs"};const id=map[p];if(id)document.getElementById(id).classList.add('active')})();
 function themeColor(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()}
 
 function confirmLogout(event) {

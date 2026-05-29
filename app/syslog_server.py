@@ -100,30 +100,38 @@ class SyslogUDPHandler:
         self.sock = None
         self.running = False
         self.thread = None
+        self.received_count = 0
+        self.started_at = None
+        self.bind_error = None
 
     def start(self):
         self.running = True
+        self.bind_error = None
         try:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock.bind((self.host, self.port))
             log.info(f"🟢 Syslog server started successfully on UDP port {self.port}")
-        except PermissionError:
+        except (PermissionError, OSError) as orig_err:
             # Fallback to port 5140 if port 514 is restricted
             alt_port = 5140
             try:
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 self.sock.bind((self.host, alt_port))
                 self.port = alt_port
-                log.info(f"🟡 Port 514 blocked (permission). Fallback Syslog server started on UDP port {self.port}")
+                self.bind_error = f"Port 514 blocked ({orig_err}). Using fallback port {alt_port}"
+                log.info(f"🟡 {self.bind_error}")
             except Exception as e:
-                log.error(f"❌ Failed to bind syslog fallback socket: {e}")
+                self.bind_error = f"Failed to bind any syslog port: {e}"
+                log.error(f"❌ {self.bind_error}")
                 self.running = False
                 return
         except Exception as e:
-            log.error(f"❌ Failed to bind syslog socket: {e}")
+            self.bind_error = f"Failed to bind syslog socket: {e}"
+            log.error(f"❌ {self.bind_error}")
             self.running = False
             return
 
+        self.started_at = datetime.now()
         self.thread = threading.Thread(target=self._listen, daemon=True, name="syslog_listener")
         self.thread.start()
 
@@ -135,6 +143,28 @@ class SyslogUDPHandler:
             except Exception:
                 pass
         log.info("🔴 Syslog server stopped")
+
+    def get_status(self):
+        """Return a dict summarizing the current state of the syslog server."""
+        return {
+            "running": self.running,
+            "port": self.port,
+            "host": self.host,
+            "received_count": self.received_count,
+            "started_at": self.started_at.strftime("%Y-%m-%d %H:%M:%S") if self.started_at else None,
+            "bind_error": self.bind_error,
+        }
+
+    def send_test(self):
+        """Send a fake Cisco-style syslog message to ourselves for verification."""
+        test_msg = "<189>1: *Test: %SYS-5-CONFIG_I: Configured from console by NetSentinel_Test"
+        try:
+            test_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            test_sock.sendto(test_msg.encode("utf-8"), ("127.0.0.1", self.port))
+            test_sock.close()
+            return True, f"Test syslog sent to 127.0.0.1:{self.port}"
+        except Exception as e:
+            return False, str(e)
 
     def _listen(self):
         buffer_size = 4096
@@ -152,18 +182,31 @@ class SyslogUDPHandler:
 
     def _parse_and_save(self, raw_msg, sender_ip):
         try:
-            # Resolve device name from database
+            self.received_count += 1
+            # Resolve device name from config/devices.yaml or fallback to database
             device_name = "Unknown"
             try:
-                with engine.connect() as conn:
-                    dev = conn.execute(
-                        text("SELECT name FROM devices WHERE host = :ip LIMIT 1"),
-                        {"ip": sender_ip}
-                    ).fetchone()
-                    if dev:
-                        device_name = dev[0]
-            except Exception as e:
-                log.debug(f"Syslog device lookup failed: {e}")
+                import yaml
+                with open("config/devices.yaml", "r", encoding="utf-8") as f:
+                    dev_conf = yaml.safe_load(f)
+                    for d in dev_conf.get("devices", []):
+                        if d.get("host") == sender_ip:
+                            device_name = d.get("name", "Unknown")
+                            break
+            except Exception as yaml_err:
+                log.debug(f"Syslog device lookup from yaml failed: {yaml_err}")
+
+            if device_name == "Unknown":
+                try:
+                    with engine.connect() as conn:
+                        dev = conn.execute(
+                            text("SELECT name FROM devices WHERE host = :ip LIMIT 1"),
+                            {"ip": sender_ip}
+                        ).fetchone()
+                        if dev:
+                            device_name = dev[0]
+                except Exception as e:
+                    log.debug(f"Syslog device lookup from db failed: {e}")
 
             # Parse PRI header (RFC 3164 / 5424)
             pri = 13  # Default facility user, severity notice

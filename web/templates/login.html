@@ -8,23 +8,23 @@
 <link href="/static/theme.css" rel="stylesheet">
 <script src="/static/theme.js"></script>
 <style>
-body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--txt); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-.login-card { background: var(--card); border: 1px solid var(--brd); border-radius: 10px; padding: 2.5rem; width: calc(100% - 2rem); max-width: 400px; box-shadow: var(--shadow); }
-.login-logo { text-align: center; margin-bottom: 2rem; }
-.login-logo .icon { width: 48px; height: 48px; background: var(--ac); border-radius: 12px; display: inline-grid; place-items: center; margin-bottom: 1rem; }
-.login-logo h1 { font-size: 1.5rem; font-weight: 700; }
+body { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+.login-card { background: var(--card); border: 1px solid var(--brd); border-radius: var(--radius); padding: 2rem; width: 100%; max-width: 380px; }
+.login-logo { text-align: center; margin-bottom: 1.75rem; }
+.login-logo .icon { width: 44px; height: 44px; background: var(--ac); border-radius: 10px; display: inline-grid; place-items: center; margin-bottom: 0.875rem; }
+.login-logo h1 { font-size: 1.25rem; font-weight: 600; }
 .login-logo h1 span { color: var(--ac); }
-.login-logo p { color: var(--txt-m); font-size: 0.85rem; margin-top: 0.25rem; }
-.form-group { margin-bottom: 1.25rem; }
-.form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--txt-m); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
-.form-group input { width: 100%; padding: 0.75rem 1rem; background: var(--panel-2); border: 1px solid var(--brd); border-radius: 7px; color: var(--txt); font-family: inherit; font-size: 0.9rem; transition: border-color 0.2s, box-shadow .2s; }
+.login-logo p { color: var(--txt-m); font-size: var(--text-sm); margin-top: 0.25rem; }
+.form-group { margin-bottom: 1rem; }
+.form-group label { display: block; font-size: var(--text-sm); font-weight: 500; color: var(--txt-m); margin-bottom: 0.35rem; }
+.form-group input { width: 100%; padding: 0.65rem 0.875rem; background: var(--panel-2); border: 1px solid var(--brd); border-radius: var(--radius-sm); color: var(--txt); font-size: var(--text-base); }
 .form-group input:focus { outline: none; border-color: var(--ac); box-shadow: var(--focus); }
 .form-group input.error { border-color: var(--err); }
-.error-msg { color: var(--err); font-size: 0.8rem; margin-top: 0.5rem; display: none; }
+.error-msg { color: var(--err); font-size: var(--text-sm); margin-top: 0.35rem; display: none; }
 .error-msg.show { display: block; }
-.alert { background: var(--err-bg); color: var(--err); padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 1rem; display: none; border: 1px solid rgba(239,68,68,0.2); }
+.alert { background: var(--err-bg); color: var(--err); padding: 0.65rem 0.875rem; border-radius: var(--radius-sm); font-size: var(--text-sm); margin-bottom: 1rem; display: none; }
 .alert.show { display: block; }
-.btn-login { width: 100%; padding: 0.75rem; background: var(--ac); color: #fff; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background 0.2s; }
+.btn-login { width: 100%; padding: 0.7rem; background: var(--ac); color: #fff; border: none; border-radius: var(--radius-sm); font-size: var(--text-base); font-weight: 600; cursor: pointer; margin-top: 0.25rem; }
 .btn-login:hover { background: var(--ac-h); }
 .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
