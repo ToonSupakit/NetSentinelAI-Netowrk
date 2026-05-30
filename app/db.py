@@ -501,13 +501,11 @@ def get_device_status(active_devices=None):
                         l.reliability, l.label, l.collected_at
                 FROM interface_logs l
                 INNER JOIN (
-                    SELECT device_name, interface_name, MAX(collected_at) as max_time
+                    SELECT MAX(id) as max_id
                     FROM interface_logs
                     WHERE device_name IN ({placeholders})
                     GROUP BY device_name, interface_name
-                ) latest ON l.device_name = latest.device_name
-                        AND l.interface_name = latest.interface_name
-                        AND l.collected_at = latest.max_time
+                ) latest ON l.id = latest.max_id
                 WHERE l.device_name IN ({placeholders})
                 ORDER BY l.device_name, l.interface_name
             """
@@ -519,12 +517,10 @@ def get_device_status(active_devices=None):
                         l.reliability, l.label, l.collected_at
                 FROM interface_logs l
                 INNER JOIN (
-                    SELECT device_name, interface_name, MAX(collected_at) as max_time
+                    SELECT MAX(id) as max_id
                     FROM interface_logs
                     GROUP BY device_name, interface_name
-                ) latest ON l.device_name = latest.device_name
-                        AND l.interface_name = latest.interface_name
-                        AND l.collected_at = latest.max_time
+                ) latest ON l.id = latest.max_id
                 ORDER BY l.device_name, l.interface_name
             """))
         rows = result.fetchall()
