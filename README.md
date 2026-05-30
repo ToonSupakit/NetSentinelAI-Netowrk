@@ -1,41 +1,24 @@
-# NetSentinel AI
+# Network Monitoring & Automation System (NetSentinel AI)
 
-NetSentinel AI is a lab-oriented network monitoring project for GNS3 or similar test environments. It collects interface data with SNMP, applies simple rule-based checks, uses a Scikit-learn Isolation Forest model for anomaly experiments, and provides a Flask dashboard for viewing device status, traffic, logs, settings, backups, and basic remediation actions.
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/ToonSupakit/NetSentinelAI-Network)
 
-This project is not intended to be presented as a production-ready NMS. It is a learning and lab automation project that demonstrates how SNMP collection, ML-assisted anomaly detection, web dashboards, syslog review, and controlled network remediation can be connected in one Python application.
+Developed a containerized network monitoring and automated remediation system for GNS3 lab environments. The system collects interface metrics via SNMP, uses an Isolation Forest model to detect traffic anomalies, and provides a Flask and Socket.IO web interface for real-time alerts and Netmiko-based Cisco CLI commands.
 
-## Current Scope
+> [!NOTE]
+> **Lab-Oriented Scope:** This project is designed for learning, experimentation, and lab automation in simulated environments (e.g., GNS3). It is not intended to be a production-ready Network Management System (NMS). It serves as a practical demonstration of integrating SNMP collection, machine learning anomaly experiments, real-time dashboards, syslog tracking, and network device configuration management inside one Python codebase.
 
-The project is useful for:
+## Key Features & Achievements
 
-- Monitoring simulated or lab network devices.
-- Testing SNMP-based interface collection.
-- Experimenting with rule-based and ML-based anomaly detection.
-- Triggering controlled remediation commands from the web dashboard in a lab.
-- Reviewing interface status, traffic, syslog entries, and backups through a web dashboard.
-- Practicing NetDevOps-style workflows with tests and GitHub Actions.
-
-The project is not yet ready for:
-
-- Direct production network use without review and hardening.
-- Internet-facing deployment without a reverse proxy, TLS, monitoring, backups, and operational controls.
-- Fully trusted automated remediation on critical devices.
-- Vendor-complete support across real enterprise networks.
+- **Machine Learning Anomaly Detection:** Combines standard threshold rules (for interface load, errors, and reliability) with an unsupervised Isolation Forest model trained on historical metrics to identify anomalous network behavior.
+- **Real-Time Glassmorphic Dashboard:** Built with Flask, Socket.IO, and a modern glassmorphic interface to stream live interface statuses, syslog events, and real-time network alert notifications.
+- **Automated Port Remediation:** Executes automated or manual interface port bounces (shutdown/no shutdown) and configures rate limiting on Cisco routers and switches using Netmiko (SSH/Telnet).
+- **Config Backup & Diff Engine:** Backs up active network device configurations and provides a Git-like comparison tool to easily view configuration changes over time.
+- **Containerized Architecture:** Fully dockerized with Docker Compose to deploy the Flask application alongside a MySQL 8.0 database with persistent storage.
+- **Scheduled Model Retraining:** Periodically retrains the Isolation Forest model in the background using historical database metrics to adjust to shifting traffic patterns.
 
 ## System Architecture
 
 <img width="1650" height="953" alt="architecture-ai-network2" src="https://github.com/user-attachments/assets/f9da1e5d-66ef-4943-9fae-1f21d15a7f5a" />
-
-## Main Features
-
-- **SNMP collection:** Polls interface status, reliability, load, errors, and IP mapping from configured devices.
-- **Rule-based detection:** Flags simple anomalies such as down interfaces, high load, low reliability, and input errors.
-- **Experimental ML detection:** Uses Isolation Forest on collected history to help identify unusual interface behavior.
-- **Dashboard:** Flask web UI for status, traffic, topology, logs, backups, settings, users, and model status.
-- **Lab remediation:** Can run vendor-specific CLI commands such as port bounce or rate-limit actions through Netmiko.
-- **Syslog view:** Receives and displays device syslog messages with simple heuristic explanations.
-- **Config backup:** Can collect running configuration from configured devices in supported lab setups.
-- **Basic security controls:** Login, roles, CSRF checks, masked secrets, and related tests are included.
 
 ## Tech Stack
 
@@ -47,6 +30,7 @@ The project is not yet ready for:
 - Scikit-learn
 - Pytest
 - Ruff and Black
+- Docker and Docker Compose
 
 ## Project Layout
 
@@ -282,25 +266,58 @@ wr
 
 The built-in syslog receiver tries UDP 514 first and falls back to UDP 5140 if 514 cannot be bound.
 
-## Run
+## Deployment & Execution
+
+You can run the application either directly in a local Python environment or containerized using Docker Compose.
+
+### 1. Running Locally (Python)
+
+Activate your virtual environment and run the main entry point:
 
 ```bash
 python main.py
 ```
 
-Dashboard:
+This starts all essential background routines:
+- Database schema initialization
+- SNMP interface metrics collector & anomaly prediction loop
+- Real-time Flask dashboard & Socket.IO stream
+- Background scheduled model retrain loop
+- UDP syslog receiver server (listens on port `514` or `5140`)
 
-```text
-http://localhost:5000
+Access the dashboard locally at: http://localhost:5000
+
+---
+
+### 2. Running in Containers (Docker Compose)
+
+The system is fully containerized, which is the recommended deployment method (especially when running alongside GNS3 on a VMware host to prevent hypervisor conflicts).
+
+Make sure `.env`, `config/config.yaml`, and `config/devices.yaml` are created locally, then run:
+
+**Build and Start Containers:**
+```bash
+sudo docker compose up -d --build
+```
+This builds and starts:
+- `netsentinel-db` (MySQL 8.0) container with persistent database volumes.
+- `netsentinel-app` container with your local directory volume-mounted (`.:/app`) so code changes sync instantly.
+- Exposes port `5000` (Web UI) and port `514` (UDP Syslog).
+
+**Monitor Status & Logs:**
+```bash
+# Check container status
+sudo docker compose ps
+
+# View application logs
+sudo docker compose logs -f app
 ```
 
-`main.py` starts:
-
-- database initialization
-- collector + predictor loop
-- Flask dashboard
-- scheduled model retrain loop
-- syslog receiver
+**Restarting the Application:**
+To apply any Python code changes without rebuilding the image, simply restart the app container:
+```bash
+sudo docker compose restart app
+```
 
 ## Demo Mode Without Devices
 
