@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: netsentinel-db
+    restart: always
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: network_ai_v2
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+
+  app:
+    build: .
+    container_name: netsentinel-app
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "5000:5000"      # Web dashboard interface (TCP)
+      - "514:514/udp"    # Syslog server receiver port (UDP)
+    environment:
+      - DB_URL=mysql+mysqlconnector://root@db/network_ai_v2
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+
+volumes:
+  mysql_data:

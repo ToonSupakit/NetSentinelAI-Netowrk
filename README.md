@@ -1,8 +1,8 @@
 # NetSentinel AI
 
-NetSentinel AI is a lab-oriented network monitoring project for GNS3 or similar test environments. It collects interface data with SNMP, applies simple rule-based checks, uses a Scikit-learn Isolation Forest model for anomaly experiments, sends optional Discord alerts, and provides a Flask dashboard for viewing device status, traffic, logs, settings, and basic remediation actions.
+NetSentinel AI is a lab-oriented network monitoring project for GNS3 or similar test environments. It collects interface data with SNMP, applies simple rule-based checks, uses a Scikit-learn Isolation Forest model for anomaly experiments, and provides a Flask dashboard for viewing device status, traffic, logs, settings, backups, and basic remediation actions.
 
-This project is not intended to be presented as a production-ready NMS. It is a learning and lab automation project that demonstrates how SNMP collection, ML-assisted anomaly detection, ChatOps, and web-based network operations can be connected in one Python application.
+This project is not intended to be presented as a production-ready NMS. It is a learning and lab automation project that demonstrates how SNMP collection, ML-assisted anomaly detection, web dashboards, syslog review, and controlled network remediation can be connected in one Python application.
 
 ## Current Scope
 
@@ -11,7 +11,7 @@ The project is useful for:
 - Monitoring simulated or lab network devices.
 - Testing SNMP-based interface collection.
 - Experimenting with rule-based and ML-based anomaly detection.
-- Triggering controlled remediation commands in a lab.
+- Triggering controlled remediation commands from the web dashboard in a lab.
 - Reviewing interface status, traffic, syslog entries, and backups through a web dashboard.
 - Practicing NetDevOps-style workflows with tests and GitHub Actions.
 
@@ -32,7 +32,6 @@ The project is not yet ready for:
 - **Rule-based detection:** Flags simple anomalies such as down interfaces, high load, low reliability, and input errors.
 - **Experimental ML detection:** Uses Isolation Forest on collected history to help identify unusual interface behavior.
 - **Dashboard:** Flask web UI for status, traffic, topology, logs, backups, settings, users, and model status.
-- **Discord alerts:** Optional Discord bot for status, anomaly history, analytics, and approval-style buttons.
 - **Lab remediation:** Can run vendor-specific CLI commands such as port bounce or rate-limit actions through Netmiko.
 - **Syslog view:** Receives and displays device syslog messages with simple heuristic explanations.
 - **Config backup:** Can collect running configuration from configured devices in supported lab setups.
@@ -46,7 +45,6 @@ The project is not yet ready for:
 - PySNMP
 - Netmiko
 - Scikit-learn
-- Discord.py
 - Pytest
 - Ruff and Black
 
@@ -62,7 +60,6 @@ The project is not yet ready for:
 ├── pytest.ini
 ├── app/
 │   ├── ai_features.py              # Training/runtime feature engineering
-│   ├── bot.py                      # Discord bot and remediation buttons
 │   ├── collector.py                # SNMP/simulator collection
 │   ├── collector_rules.py          # Rule helpers
 │   ├── db.py                       # Database schema and queries
@@ -93,7 +90,6 @@ The project is not yet ready for:
 - MySQL 8.0+ for the main database flow
 - Network devices reachable from the machine running the app
 - SNMP enabled on devices, or simulator mode for demo use
-- Optional Discord bot token and channel ID
 - Optional SSH/Telnet access for remediation and config backup
 
 ## Setup
@@ -136,15 +132,12 @@ Edit `.env`:
 ```env
 DB_URL=mysql+mysqlconnector://root:YOUR_PASSWORD@localhost/network_ai_v2
 
-DISCORD_TOKEN=your_discord_bot_token
-DISCORD_CHANNEL_ID=your_channel_id
-
 DEVICE_USERNAME=admin
 DEVICE_PASSWORD=admin123
 DEVICE_SECRET=admin123
 
 SNMP_COMMUNITY=public
-FLASK_SECRET=change-this-long-random-value
+FLASK_SECRET=change-this-long-random-value-at-least-32-characters
 
 # Optional dashboard seed credentials for first run
 DASH_USER=admin
@@ -308,7 +301,6 @@ http://localhost:5000
 - Flask dashboard
 - scheduled model retrain loop
 - syslog receiver
-- Discord bot if `DISCORD_TOKEN` is set
 
 ## Demo Mode Without Devices
 
@@ -411,25 +403,6 @@ Admin-only:
 | PUT | `/api/users/<id>/role` | Change role with guard rails |
 
 Mutating endpoints require an `X-CSRF-Token` header or `csrf_token` form field.
-
-## Discord Bot
-
-Commands:
-
-| Command | Description |
-| --- | --- |
-| `!status` | Show current interface status |
-| `!history` | Show latest anomalies |
-| `!analytics` | Show summary metrics |
-| `!help` | Show commands |
-
-Alert buttons are intended for lab control only:
-
-- Approve Fix
-- Check Status
-- Rate Limit
-- Remove Limit
-- Ignore
 
 ## Tests And Quality
 

@@ -5,8 +5,6 @@ import re
 
 ENV_KEYS = frozenset(
     {
-        "DISCORD_TOKEN",
-        "DISCORD_CHANNEL_ID",
         "DEVICE_USERNAME",
         "DEVICE_PASSWORD",
         "DEVICE_SECRET",
@@ -24,7 +22,6 @@ ENV_KEYS = frozenset(
 )
 ENV_SECRET_KEYS = frozenset(
     {
-        "DISCORD_TOKEN",
         "DEVICE_PASSWORD",
         "DEVICE_SECRET",
         "SNMP_COMMUNITY",
@@ -115,8 +112,6 @@ def validate_env_payload(data):
             return False, f"{key} cannot contain newlines"
         if len(text) > 4096:
             return False, f"{key} is too long"
-        if key == "DISCORD_CHANNEL_ID" and text.strip() and not text.strip().isdigit():
-            return False, "DISCORD_CHANNEL_ID must be numeric"
         if key == "DASHBOARD_PORT" and text.strip() and not text.strip().isdigit():
             return False, "DASHBOARD_PORT must be numeric"
         if key == "SESSION_COOKIE_SECURE" and text.strip().lower() not in {"1", "0", "true", "false", "yes", "no", "on", "off"}:

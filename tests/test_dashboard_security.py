@@ -110,21 +110,21 @@ def test_env_update_preserves_comments_order_and_skips_blank_secrets(client, tmp
     token = _admin_session(client)
     env_path = tmp_path / ".env"
     env_path.write_text(
-        "# keep this comment\n" "DISCORD_CHANNEL_ID=111\n" "DEVICE_PASSWORD=oldpass\n" "UNRELATED=value\n",
+        "# keep this comment\n" "DEVICE_USERNAME=oldadmin\n" "DEVICE_PASSWORD=oldpass\n" "UNRELATED=value\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(dash, "ENV_PATH", str(env_path))
 
     resp = client.post(
         "/api/settings/env",
-        json={"DISCORD_CHANNEL_ID": "222", "DEVICE_PASSWORD": ""},
+        json={"DEVICE_USERNAME": "netadmin", "DEVICE_PASSWORD": ""},
         headers={"X-CSRF-Token": token},
     )
 
     assert resp.status_code == 200
     text = env_path.read_text(encoding="utf-8")
     assert "# keep this comment" in text
-    assert "DISCORD_CHANNEL_ID=222" in text
+    assert "DEVICE_USERNAME=netadmin" in text
     assert "DEVICE_PASSWORD=oldpass" in text
     assert "UNRELATED=value" in text
 

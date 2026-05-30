@@ -1485,7 +1485,6 @@ def api_get_env():
         {
             "success": True,
             "data": {
-                "DISCORD_CHANNEL_ID": os.getenv("DISCORD_CHANNEL_ID", ""),
                 "DEVICE_USERNAME": os.getenv("DEVICE_USERNAME", ""),
                 "SNMP_V3_USER": os.getenv("SNMP_V3_USER", ""),
                 "APP_ENV": os.getenv("APP_ENV", ""),
@@ -1493,7 +1492,6 @@ def api_get_env():
                 "DASHBOARD_HOST": os.getenv("DASHBOARD_HOST", ""),
                 "DASHBOARD_PORT": os.getenv("DASHBOARD_PORT", ""),
                 "SOCKETIO_CORS_ORIGINS": os.getenv("SOCKETIO_CORS_ORIGINS", ""),
-                "DISCORD_TOKEN_CONFIGURED": _env_nonempty("DISCORD_TOKEN"),
                 "DEVICE_PASSWORD_CONFIGURED": _env_nonempty("DEVICE_PASSWORD"),
                 "DEVICE_SECRET_CONFIGURED": _env_nonempty("DEVICE_SECRET"),
                 "SNMP_COMMUNITY_CONFIGURED": _env_nonempty("SNMP_COMMUNITY"),
