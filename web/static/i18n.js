@@ -243,7 +243,12 @@ const NetSentinelI18n = {
     "SNMPv3 Username": "ชื่อผู้ใช้ SNMPv3",
     "SNMPv3 Auth Password": "รหัสผ่าน Auth ของ SNMPv3",
     "SNMPv3 Privacy Password": "รหัสผ่าน Privacy ของ SNMPv3",
-    "Save Environment": "บันทึก Environment",
+    "Flask Secret Key": "คีย์ลับ Flask (Secret Key)",
+    "App Environment": "สภาพแวดล้อมแอป (App Environment)",
+    "Secure Cookies": "ความปลอดภัยคุกกี้ (Secure Cookies)",
+    "Dashboard Host": "โฮสต์แดชบอร์ด (Dashboard Host)",
+    "Dashboard Port": "พอร์ตแดชบอร์ด (Dashboard Port)",
+    "Socket.IO Allowed Origins": "Socket.IO Allowed Origins",
 
     // Auth
     "Confirm Logout": "ยืนยันการออกจากระบบ",
@@ -305,6 +310,9 @@ const NetSentinelI18n = {
     "SNMPv3 security username. Leave empty if your devices use SNMP v1/v2c only.": "ชื่อผู้ใช้ความปลอดภัยของ SNMPv3 ปล่อยว่างได้หากใช้งานเฉพาะ SNMP v1/v2c",
     "SNMPv3 authentication password used to verify collector access.": "รหัสผ่าน authentication ของ SNMPv3 สำหรับยืนยันสิทธิ์ collector",
     "SNMPv3 privacy password used for encrypted SNMP polling.": "รหัสผ่าน privacy ของ SNMPv3 สำหรับการดึงข้อมูล SNMP แบบเข้ารหัส",
+    "Strong random secret used to sign dashboard sessions and CSRF tokens. Required in production.": "คีย์สุ่มความปลอดภัยสูงสำหรับลงลายเซ็นดิจิทัลของเซสชันและป้องกัน CSRF (จำเป็นต้องใช้ในโหมด Production)",
+    "Use production to enable stricter startup checks and secure session defaults.": "เลือกใช้ production เพื่อเปิดใช้งานการตรวจสอบระบบที่เข้มงวดขึ้นและการตั้งค่าเซสชันที่ปลอดภัย",
+    "Set true when the dashboard is served through HTTPS. Production mode enables this automatically.": "ตั้งเป็น true เมื่อเรียกใช้งานแดชบอร์ดผ่าน HTTPS (โหมด Production จะเปิดให้อัตโนมัติ)",
   },
 
   /**
