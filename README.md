@@ -18,7 +18,8 @@ Developed a containerized network monitoring and automated remediation system fo
 
 ## System Architecture
 
-<img width="1650" height="953" alt="architecture-ai-network2" src="https://github.com/user-attachments/assets/f9da1e5d-66ef-4943-9fae-1f21d15a7f5a" />
+<img width="1650" height="953" alt="diagram-network-ai3" src="https://github.com/user-attachments/assets/3efa0c99-4a5f-4562-a87e-314248d75c4d" />
+
 
 ## Tech Stack
 
